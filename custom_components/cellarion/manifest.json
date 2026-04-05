@@ -1,0 +1,11 @@
+{
+  "domain": "cellarion",
+  "name": "Cellarion",
+  "codeowners": ["@jagduvi1"],
+  "config_flow": true,
+  "documentation": "https://github.com/jagduvi1/ha-cellarion",
+  "integration_type": "hub",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/jagduvi1/ha-cellarion/issues",
+  "version": "1.0.0"
+}

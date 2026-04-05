@@ -1,0 +1,58 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to Cellarion",
+        "description": "Enter your Cellarion instance URL and login credentials.",
+        "data": {
+          "url": "URL",
+          "email": "Email",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Unable to connect to Cellarion. Check the URL.",
+      "invalid_auth": "Invalid email or password.",
+      "unknown": "An unexpected error occurred."
+    },
+    "abort": {
+      "already_configured": "This Cellarion account is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Cellarion Options",
+        "data": {
+          "scan_interval": "Update interval (seconds)"
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "total_bottles": { "name": "Total bottles" },
+      "collection_value": { "name": "Collection value" },
+      "unique_wines": { "name": "Unique wines" },
+      "cellar_count": { "name": "Cellars" },
+      "average_rating": { "name": "Average rating" },
+      "countries": { "name": "Countries" },
+      "bottles_at_peak": { "name": "Bottles at peak" },
+      "bottles_declining": { "name": "Bottles declining" },
+      "bottles_not_ready": { "name": "Bottles not ready" },
+      "bottles_early": { "name": "Bottles early window" },
+      "bottles_late": { "name": "Bottles late window" },
+      "consumed_bottles": { "name": "Consumed bottles" },
+      "intake_per_year": { "name": "Intake per year" },
+      "runway_years": { "name": "Runway (years)" },
+      "oldest_vintage": { "name": "Oldest vintage" },
+      "newest_vintage": { "name": "Newest vintage" },
+      "health_score": { "name": "Collection health score" },
+      "unread_notifications": { "name": "Unread notifications" },
+      "wine_types": { "name": "Wine types" },
+      "top_producers": { "name": "Top producers" },
+      "service_health": { "name": "Service status" }
+    }
+  }
+}
