@@ -62,7 +62,8 @@ class CellarionConfigFlow(ConfigFlow, domain=DOMAIN):
                 await client.authenticate()
             except CellarionAuthError:
                 errors["base"] = "invalid_auth"
-            except CellarionApiError:
+            except CellarionApiError as err:
+                _LOGGER.error("Cannot connect to Cellarion at %s: %s", url, err)
                 errors["base"] = "cannot_connect"
             except Exception:
                 _LOGGER.exception("Unexpected error during setup")

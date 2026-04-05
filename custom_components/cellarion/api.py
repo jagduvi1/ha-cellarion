@@ -35,13 +35,16 @@ class CellarionApiClient:
 
     async def authenticate(self) -> bool:
         """Authenticate and store JWT token."""
+        login_url = f"{self._url}/api/auth/login"
+        _LOGGER.debug("Authenticating to %s", login_url)
         try:
             resp = await self._session.post(
-                f"{self._url}/api/auth/login",
+                login_url,
                 json={"email": self._email, "password": self._password},
                 timeout=aiohttp.ClientTimeout(total=15),
             )
         except aiohttp.ClientError as err:
+            _LOGGER.error("Connection to %s failed: %s", login_url, err)
             raise CellarionApiError(f"Connection failed: {err}") from err
 
         if resp.status == 401:
