@@ -3,9 +3,9 @@
 [![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A Home Assistant custom integration for [Cellarion](https://cellarion.app) — the self-hosted wine cellar management app.
+A Home Assistant custom integration for [Cellarion](https://cellarion.app) — the wine cellar management service. Track your collection, drink windows, and cellar value at **[cellarion.app](https://cellarion.app)**, and bring it all into your smart home. (Prefer to run your own? Cellarion can also be self-hosted — the integration works with both.)
 
-Your wine data stays in Cellarion. This integration reads from the Cellarion API and exposes sensors in Home Assistant for dashboards and automations.
+Your wine data stays in your Cellarion account. This integration reads from the Cellarion API and exposes sensors in Home Assistant for dashboards and automations.
 
 ## Features
 
@@ -175,7 +175,7 @@ automation:
 ## Requirements
 
 - Home Assistant 2024.1 or newer
-- A Cellarion account (hosted or self-hosted)
+- A [cellarion.app](https://cellarion.app) account (or your own self-hosted Cellarion instance)
 
 ## Development
 
