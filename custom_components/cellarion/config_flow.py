@@ -9,7 +9,12 @@ from urllib.parse import urlparse
 
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigEntry, ConfigFlow, OptionsFlow
+from homeassistant.config_entries import (
+    SOURCE_REAUTH,
+    ConfigEntry,
+    ConfigFlow,
+    OptionsFlow,
+)
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
@@ -17,6 +22,11 @@ try:  # HA 2024.4+
     from homeassistant.config_entries import ConfigFlowResult
 except ImportError:  # pragma: no cover — older HA
     from homeassistant.data_entry_flow import FlowResult as ConfigFlowResult
+
+try:  # HA 2024.4+
+    from homeassistant.config_entries import SOURCE_RECONFIGURE
+except ImportError:  # pragma: no cover — older HA
+    SOURCE_RECONFIGURE = "reconfigure"
 
 from .api import (
     CellarionApiClient,
@@ -68,7 +78,11 @@ class CellarionConfigFlow(ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
     def __init__(self) -> None:
-        self._reauth_entry: ConfigEntry | None = None
+        self._entry: ConfigEntry | None = None  # reauth/reconfigure target
+
+    @property
+    def _is_reauth(self) -> bool:
+        return self.source == SOURCE_REAUTH
 
     # ── Entry points ─────────────────────────────────────────────────
 
@@ -84,7 +98,7 @@ class CellarionConfigFlow(ConfigFlow, domain=DOMAIN):
         self, entry_data: dict[str, Any]
     ) -> ConfigFlowResult:
         """Handle reauth when credentials stop working."""
-        self._reauth_entry = self.hass.config_entries.async_get_entry(
+        self._entry = self.hass.config_entries.async_get_entry(
             self.context["entry_id"]
         )
         return await self.async_step_reauth_confirm()
@@ -101,6 +115,17 @@ class CellarionConfigFlow(ConfigFlow, domain=DOMAIN):
             step_id="reauth_confirm", menu_options=["token", "password"]
         )
 
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Reconfigure the entry (change URL or credentials)."""
+        self._entry = self.hass.config_entries.async_get_entry(
+            self.context["entry_id"]
+        )
+        return self.async_show_menu(
+            step_id="reconfigure", menu_options=["token", "password"]
+        )
+
     # ── API token path ───────────────────────────────────────────────
 
     async def async_step_token(
@@ -108,12 +133,14 @@ class CellarionConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         """Authenticate with a pasted personal API token."""
         errors: dict[str, str] = {}
-        entry = self._reauth_entry
+        entry = self._entry
 
         if user_input is not None:
+            # Reauth keeps the entry URL; new setup and reconfigure take it
+            # from the form
             url = (
                 entry.data[CONF_URL]
-                if entry
+                if entry and self._is_reauth
                 else user_input[CONF_URL].rstrip("/")
             )
             token = user_input[CONF_TOKEN].strip()
@@ -122,7 +149,7 @@ class CellarionConfigFlow(ConfigFlow, domain=DOMAIN):
             if error:
                 errors["base"] = error
             elif entry:
-                return await self._async_finish_reauth(
+                return await self._async_finish_existing(
                     {
                         CONF_URL: url,
                         CONF_EMAIL: entry.data.get(CONF_EMAIL),
@@ -140,16 +167,16 @@ class CellarionConfigFlow(ConfigFlow, domain=DOMAIN):
                     options={CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL},
                 )
 
-        schema = (
-            vol.Schema({vol.Required(CONF_TOKEN): str})
-            if entry
-            else vol.Schema(
+        if entry and self._is_reauth:
+            schema = vol.Schema({vol.Required(CONF_TOKEN): str})
+        else:
+            default_url = entry.data[CONF_URL] if entry else DEFAULT_URL
+            schema = vol.Schema(
                 {
-                    vol.Required(CONF_URL, default=DEFAULT_URL): str,
+                    vol.Required(CONF_URL, default=default_url): str,
                     vol.Required(CONF_TOKEN): str,
                 }
             )
-        )
         return self.async_show_form(
             step_id="token", data_schema=schema, errors=errors
         )
@@ -161,12 +188,12 @@ class CellarionConfigFlow(ConfigFlow, domain=DOMAIN):
     ) -> ConfigFlowResult:
         """Authenticate with email+password; mint and store an API token."""
         errors: dict[str, str] = {}
-        entry = self._reauth_entry
+        entry = self._entry
 
         if user_input is not None:
             url = (
                 entry.data[CONF_URL]
-                if entry
+                if entry and self._is_reauth
                 else user_input[CONF_URL].rstrip("/")
             )
             email = user_input[CONF_EMAIL]
@@ -207,14 +234,14 @@ class CellarionConfigFlow(ConfigFlow, domain=DOMAIN):
 
             if data is not None:
                 if entry:
-                    return await self._async_finish_reauth(data)
+                    return await self._async_finish_existing(data)
                 return self.async_create_entry(
                     title=f"Cellarion ({email})",
                     data=data,
                     options={CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL},
                 )
 
-        if entry:
+        if entry and self._is_reauth:
             schema = vol.Schema(
                 {
                     vol.Required(
@@ -224,10 +251,14 @@ class CellarionConfigFlow(ConfigFlow, domain=DOMAIN):
                 }
             )
         else:
+            default_url = entry.data[CONF_URL] if entry else DEFAULT_URL
             schema = vol.Schema(
                 {
-                    vol.Required(CONF_URL, default=DEFAULT_URL): str,
-                    vol.Required(CONF_EMAIL): str,
+                    vol.Required(CONF_URL, default=default_url): str,
+                    vol.Required(
+                        CONF_EMAIL,
+                        default=entry.data.get(CONF_EMAIL, "") if entry else "",
+                    ): str,
                     vol.Required(CONF_PASSWORD): str,
                 }
             )
@@ -237,17 +268,21 @@ class CellarionConfigFlow(ConfigFlow, domain=DOMAIN):
 
     # ── Helpers ──────────────────────────────────────────────────────
 
-    async def _async_finish_reauth(
+    async def _async_finish_existing(
         self, data: dict[str, Any]
     ) -> ConfigFlowResult:
         """Store new credentials on the existing entry and reload."""
-        entry = self._reauth_entry
+        entry = self._entry
         assert entry is not None
         self.hass.config_entries.async_update_entry(
             entry, data={k: v for k, v in data.items() if v is not None}
         )
         await self.hass.config_entries.async_reload(entry.entry_id)
-        return self.async_abort(reason="reauth_successful")
+        return self.async_abort(
+            reason="reauth_successful"
+            if self._is_reauth
+            else "reconfigure_successful"
+        )
 
     @staticmethod
     @callback

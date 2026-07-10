@@ -82,6 +82,11 @@ the internet.
 
 ## Sensors
 
+Sensors marked *disabled by default* can be enabled per entity under
+**Settings → Devices & Services → Cellarion → entities**. The integration
+also supports **reconfiguration** (change URL or credentials from the
+entry's menu) and **diagnostics download** (token and account redacted).
+
 | Sensor | Description | Attributes |
 |--------|-------------|------------|
 | Total bottles | Bottles in your collection | — |
@@ -89,7 +94,7 @@ the internet.
 | Unique wines | Distinct wine definitions | — |
 | Cellars | Number of cellars | per-cellar breakdown |
 | Average rating | Mean rating across bottles | — |
-| Countries | Countries represented | top 5 countries |
+| Countries | Countries represented (disabled by default) | top 5 countries |
 | Bottles at peak | Ready to drink now | ready-to-drink list (top 10, with ids) |
 | Bottles declining | Past peak, drink soon! | urgent bottles list |
 | Bottles not ready | Too young to open | — |
@@ -98,12 +103,12 @@ the internet.
 | Consumed bottles | Total consumed (increasing) | — |
 | Intake per year | Average bottles added/year | — |
 | Runway (years) | Years until cellar is empty | — |
-| Oldest vintage | Oldest bottle year | — |
-| Newest vintage | Newest bottle year | — |
+| Oldest vintage | Oldest bottle year (disabled by default) | — |
+| Newest vintage | Newest bottle year (disabled by default) | — |
 | Health score | Collection health metric | grade |
 | Unread notifications | Pending notifications | — |
-| Wine types | Number of wine types | type breakdown |
-| Top producers | Number of top producers | producer list (top 10) |
+| Wine types | Number of wine types (disabled by default) | type breakdown |
+| Top producers | Number of top producers (disabled by default) | producer list (top 10) |
 | Service status | Cellarion instance health | — |
 
 ## Services
@@ -198,7 +203,7 @@ automation:
 
 ## Requirements
 
-- Home Assistant 2024.1 or newer (the bundled brand icon shows on 2026.3+)
+- Home Assistant 2024.4 or newer (the bundled brand icon shows on 2026.3+)
 - A [cellarion.app](https://cellarion.app) account (or your own self-hosted Cellarion instance)
 - Cellarion server v1.75+ unlocks instant updates, API tokens, and the
   card's consume button; older servers work with polling and password login

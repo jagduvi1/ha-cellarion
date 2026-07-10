@@ -19,6 +19,7 @@ from .api import (
     CellarionAuthError,
     CellarionScopeError,
 )
+from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -60,14 +61,24 @@ class CellarionCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             # Token valid but missing the read scope — user must provide a
             # properly scoped token; the reauth flow lets them do that.
             raise ConfigEntryAuthFailed(
-                f"API token lacks the required scope: {err}"
+                translation_domain=DOMAIN,
+                translation_key="scope_missing",
+                translation_placeholders={"error": str(err)},
             ) from err
         except CellarionAuthError as err:
             # Stop polling and trigger HA's reauth flow. Retrying a bad
             # password every poll would trip Cellarion's account lockout.
-            raise ConfigEntryAuthFailed(f"Authentication failed: {err}") from err
+            raise ConfigEntryAuthFailed(
+                translation_domain=DOMAIN,
+                translation_key="auth_failed",
+                translation_placeholders={"error": str(err)},
+            ) from err
         except CellarionApiError as err:
-            raise UpdateFailed(f"API error: {err}") from err
+            raise UpdateFailed(
+                translation_domain=DOMAIN,
+                translation_key="update_failed",
+                translation_placeholders={"error": str(err)},
+            ) from err
 
         stats = stats_data.get("stats", {})
         overview = stats.get("overview", {})

@@ -17,6 +17,14 @@
           "password": "Email & password"
         }
       },
+      "reconfigure": {
+        "title": "Reconfigure Cellarion",
+        "description": "Change the instance URL or the credentials.",
+        "menu_options": {
+          "token": "API token (recommended)",
+          "password": "Email & password"
+        }
+      },
       "token": {
         "title": "Connect with an API token",
         "description": "Create a token with the read and consume scopes in Cellarion under Settings → API tokens, then paste it here.",
@@ -44,7 +52,31 @@
     },
     "abort": {
       "already_configured": "This Cellarion account is already configured.",
-      "reauth_successful": "Re-authentication was successful."
+      "reauth_successful": "Re-authentication was successful.",
+      "reconfigure_successful": "Reconfiguration was successful."
+    }
+  },
+  "exceptions": {
+    "auth_failed": {
+      "message": "Authentication with Cellarion failed: {error}"
+    },
+    "scope_missing": {
+      "message": "The Cellarion API token lacks a required scope: {error}"
+    },
+    "update_failed": {
+      "message": "Error communicating with Cellarion: {error}"
+    },
+    "no_accounts": {
+      "message": "No Cellarion accounts are configured."
+    },
+    "unknown_entry": {
+      "message": "Unknown Cellarion config entry: {entry_id}"
+    },
+    "multiple_accounts": {
+      "message": "Multiple Cellarion accounts are configured; pass entry_id to choose one."
+    },
+    "consume_failed": {
+      "message": "Could not consume the bottle: {error}"
     }
   },
   "options": {
