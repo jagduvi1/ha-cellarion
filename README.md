@@ -9,6 +9,10 @@ A Home Assistant custom integration for [Cellarion](https://cellarion.app) — t
 
 Your wine data stays in your Cellarion account. This integration reads from the Cellarion API and exposes sensors in Home Assistant for dashboards and automations.
 
+<p align="center">
+  <img src="docs/images/card.png" alt="The bundled Cellarion card: collection stats, drink-window bar, ready-to-drink and drink-soon lists with one-tap consume" width="520">
+</p>
+
 ## Features
 
 - **Dashboard card included** — a ready-made card with collection stats, a drink-window bar, and the bottles that need attention; no extra install
@@ -149,6 +153,8 @@ automation:
 > then add cards there.
 
 ### Cellarion Card (bundled)
+
+![A Home Assistant dashboard with the Cellarion card and an entities card showing Cellarion sensors](docs/images/dashboard.png)
 
 The integration ships with a custom Lovelace card and registers it
 automatically — no extra install. Add it from the dashboard card picker
