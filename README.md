@@ -1,6 +1,8 @@
 # Cellarion for Home Assistant
 
 [![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz)
+[![Release](https://img.shields.io/github/v/release/jagduvi1/ha-cellarion)](https://github.com/jagduvi1/ha-cellarion/releases)
+[![Validate](https://github.com/jagduvi1/ha-cellarion/actions/workflows/validate.yml/badge.svg)](https://github.com/jagduvi1/ha-cellarion/actions/workflows/validate.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 A Home Assistant custom integration for [Cellarion](https://cellarion.app) — the wine cellar management service. Track your collection, drink windows, and cellar value at **[cellarion.app](https://cellarion.app)**, and bring it all into your smart home. (Prefer to run your own? Cellarion can also be self-hosted — the integration works with both.)
@@ -14,7 +16,8 @@ Your wine data stays in your Cellarion account. This integration reads from the 
 - **Drink window tracking** — bottles at peak, declining, not ready, early/late window
 - **Maturity alerts** — urgent bottles listed as sensor attributes
 - **Consume from Home Assistant** — mark bottles drank/gifted/sold via the `cellarion.consume_bottle` service, from the card, automations, or NFC tags
-- **Instant updates** — on Cellarion servers with push support, sensors update within seconds of a change (automatic, no ports to open)
+- **Instant updates** — on Cellarion v1.75+, sensors update within seconds of a change (automatic, no ports to open)
+- **Secure by default** — authenticates with a scoped API token; your Cellarion password is never stored in Home Assistant
 - **Pace & runway** — intake per year, years until your cellar is empty
 - **Cellar breakdown** — per-cellar bottle counts and values
 - **Wine types & producers** — breakdown by type, top producers
@@ -58,11 +61,24 @@ After setup, you can adjust the polling interval (default: 30 minutes) via the i
 ### How updates arrive
 
 The integration polls your Cellarion instance on the configured interval.
-On servers that support the push event stream (`/api/events/stream`), it
-also holds an outbound connection and updates sensors within seconds of a
-change, relaxing polling to a 6-hour safety net. This is detected
-automatically — no configuration, and your Home Assistant never needs to
-be reachable from the internet.
+On Cellarion v1.75+ it also holds an outbound connection to the push
+event stream and updates sensors within seconds of a change, relaxing
+polling to a 6-hour safety net. This is detected automatically — no
+configuration, and your Home Assistant never needs to be reachable from
+the internet.
+
+### Security
+
+- Home Assistant stores a **scoped API token** (`read` + `consume`), not
+  your Cellarion password — the password path only uses your credentials
+  once to create the token.
+- Setups made with older versions of this integration are migrated to a
+  token automatically on their first start against Cellarion v1.75+.
+- Tokens can be reviewed and revoked anytime in Cellarion under
+  **Settings → API tokens**; revoking one triggers Home Assistant's
+  re-authentication prompt.
+- Only on pre-v1.75 self-hosted servers (no token support) does the
+  integration fall back to storing the password.
 
 ## Sensors
 
@@ -142,10 +158,9 @@ prefix: sensor.cellarion    # optional — entity id prefix
 It shows your collection stats, a drink-window distribution bar, and the
 bottles that need attention. Clicking any number opens the sensor's
 more-info dialog, the card title opens your Cellarion instance, and — on
-Cellarion servers that expose bottle ids — each urgent bottle gets a
-one-tap consume button (with confirmation). If your dashboards run in
-YAML mode, add `/cellarion-files/cellarion-card.js` as a module resource
-manually.
+Cellarion v1.75+ — each urgent bottle gets a one-tap consume button
+(with confirmation). If your dashboards run in YAML mode, add
+`/cellarion-files/cellarion-card.js` as a module resource manually.
 
 ### Simple Entities Card
 
@@ -180,8 +195,10 @@ automation:
 
 ## Requirements
 
-- Home Assistant 2024.1 or newer
+- Home Assistant 2024.1 or newer (the bundled brand icon shows on 2026.3+)
 - A [cellarion.app](https://cellarion.app) account (or your own self-hosted Cellarion instance)
+- Cellarion server v1.75+ unlocks instant updates, API tokens, and the
+  card's consume button; older servers work with polling and password login
 
 ## Development
 
