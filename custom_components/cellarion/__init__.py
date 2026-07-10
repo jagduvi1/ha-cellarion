@@ -17,7 +17,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.loader import async_get_integration
 
 from .api import CellarionApiClient, CellarionApiError
-from .const import CONF_EMAIL, CONF_PASSWORD, CONF_SCAN_INTERVAL, CONF_URL, DEFAULT_SCAN_INTERVAL, DOMAIN
+from .const import CONF_EMAIL, CONF_PASSWORD, CONF_SCAN_INTERVAL, CONF_TOKEN, CONF_URL, DEFAULT_SCAN_INTERVAL, DOMAIN
 from .coordinator import CellarionCoordinator
 from .push import async_push_listener
 
@@ -148,8 +148,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     client = CellarionApiClient(
         session=session,
         url=entry.data[CONF_URL],
-        email=entry.data[CONF_EMAIL],
-        password=entry.data[CONF_PASSWORD],
+        email=entry.data.get(CONF_EMAIL),
+        password=entry.data.get(CONF_PASSWORD),
+        token=entry.data.get(CONF_TOKEN),
     )
 
     scan_interval = entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)

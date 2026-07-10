@@ -25,6 +25,14 @@ class CellarionPushForbidden(CellarionApiError):
     """The credential lacks the scope required for the push stream."""
 
 
+class CellarionScopeError(CellarionApiError):
+    """The API token is valid but lacks a required scope."""
+
+
+class CellarionTokensNotSupported(CellarionApiError):
+    """The server does not support personal API tokens."""
+
+
 class CellarionApiClient:
     """Async API client for Cellarion."""
 
@@ -32,17 +40,25 @@ class CellarionApiClient:
         self,
         session: aiohttp.ClientSession,
         url: str,
-        email: str,
-        password: str,
+        email: str | None = None,
+        password: str | None = None,
+        token: str | None = None,
     ) -> None:
         self._session = session
         self._url = url.rstrip("/")
         self._email = email
         self._password = password
-        self._token: str | None = None
+        # Personal API token (cel_...) — static, never refreshed via login
+        self._api_token = token
+        self._token: str | None = token
 
     async def authenticate(self) -> bool:
         """Authenticate and store JWT token."""
+        if self._api_token:
+            # Static API token: there is nothing to refresh. Reaching this
+            # means the server rejected it — revoked or invalid.
+            raise CellarionAuthError("API token rejected (revoked or invalid)")
+
         login_url = f"{self._url}/api/auth/login"
         _LOGGER.debug("Authenticating to %s", login_url)
         try:
@@ -109,6 +125,12 @@ class CellarionApiClient:
             if resp.status == 401:
                 raise CellarionAuthError("Authentication rejected after retry")
 
+        if resp.status == 403 and self._api_token:
+            # Valid token, missing scope — a config error; re-login won't help
+            raise CellarionScopeError(
+                f"API token lacks the scope for {method} {path}"
+            )
+
         if resp.status != 200:
             detail = ""
             try:
@@ -133,6 +155,50 @@ class CellarionApiClient:
     async def get_notifications(self) -> dict:
         """Fetch notifications with unread count."""
         return await self._request("GET", "/api/notifications")
+
+    async def async_create_api_token(self, name: str, scopes: list[str]) -> str:
+        """Mint a personal API token. Requires password-based login.
+
+        The Cellarion endpoint requires the account password in the body as
+        confirmation; the caller stores only the returned token.
+        """
+        if not self._password:
+            raise CellarionApiError("Password login required to mint a token")
+        if not self._token:
+            await self.authenticate()
+
+        try:
+            resp = await self._session.post(
+                f"{self._url}/api/tokens",
+                headers={"Authorization": f"Bearer {self._token}"},
+                json={
+                    "name": name,
+                    "scopes": scopes,
+                    "password": self._password,
+                },
+                timeout=aiohttp.ClientTimeout(total=15),
+            )
+        except (aiohttp.ClientError, TimeoutError) as err:
+            raise CellarionApiError(f"Token creation failed: {err}") from err
+
+        if resp.status in (404, 405, 501):
+            raise CellarionTokensNotSupported(
+                "Server does not support API tokens"
+            )
+        if resp.status in (401, 403):
+            raise CellarionAuthError("Password confirmation rejected")
+        if resp.status == 429:
+            raise CellarionApiError("Rate limited by Cellarion, try again later")
+        if resp.status not in (200, 201):
+            raise CellarionApiError(
+                f"Token creation returned status {resp.status}"
+            )
+
+        data = await resp.json()
+        token = data.get("token")
+        if not token:
+            raise CellarionApiError("No token in creation response")
+        return token
 
     async def consume_bottle(
         self,

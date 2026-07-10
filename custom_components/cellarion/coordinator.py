@@ -13,7 +13,12 @@ from homeassistant.helpers.update_coordinator import (
     UpdateFailed,
 )
 
-from .api import CellarionApiClient, CellarionApiError, CellarionAuthError
+from .api import (
+    CellarionApiClient,
+    CellarionApiError,
+    CellarionAuthError,
+    CellarionScopeError,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -44,6 +49,12 @@ class CellarionCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             cellars_data = await self.client.get_cellars()
             notifications_data = await self.client.get_notifications()
             health_data = await self.client.get_health()
+        except CellarionScopeError as err:
+            # Token valid but missing the read scope — user must provide a
+            # properly scoped token; the reauth flow lets them do that.
+            raise ConfigEntryAuthFailed(
+                f"API token lacks the required scope: {err}"
+            ) from err
         except CellarionAuthError as err:
             # Stop polling and trigger HA's reauth flow. Retrying a bad
             # password every poll would trip Cellarion's account lockout.
