@@ -7,6 +7,7 @@ from datetime import timedelta
 from typing import Any
 
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
     UpdateFailed,
@@ -25,6 +26,7 @@ class CellarionCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         hass: HomeAssistant,
         client: CellarionApiClient,
         scan_interval: int,
+        url: str,
     ) -> None:
         super().__init__(
             hass,
@@ -33,6 +35,7 @@ class CellarionCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             update_interval=timedelta(seconds=scan_interval),
         )
         self.client = client
+        self.url = url
 
     async def _async_update_data(self) -> dict[str, Any]:
         """Fetch data from Cellarion API."""
@@ -42,7 +45,9 @@ class CellarionCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             notifications_data = await self.client.get_notifications()
             health_data = await self.client.get_health()
         except CellarionAuthError as err:
-            raise UpdateFailed(f"Authentication failed: {err}") from err
+            # Stop polling and trigger HA's reauth flow. Retrying a bad
+            # password every poll would trip Cellarion's account lockout.
+            raise ConfigEntryAuthFailed(f"Authentication failed: {err}") from err
         except CellarionApiError as err:
             raise UpdateFailed(f"API error: {err}") from err
 
@@ -65,4 +70,5 @@ class CellarionCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "notifications": notifications_data.get("notifications", []),
             "unread_count": notifications_data.get("unreadCount", 0),
             "health": health_data.get("status", "unknown"),
+            "instance_url": self.url,
         }

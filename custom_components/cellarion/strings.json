@@ -6,7 +6,14 @@
         "description": "Enter your Cellarion instance URL and login credentials.",
         "data": {
           "url": "URL",
-          "email": "Email",
+          "email": "Email or username",
+          "password": "Password"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate with Cellarion",
+        "description": "The password for {email} is no longer valid. Enter the new password.",
+        "data": {
           "password": "Password"
         }
       }
@@ -17,7 +24,8 @@
       "unknown": "An unexpected error occurred."
     },
     "abort": {
-      "already_configured": "This Cellarion account is already configured."
+      "already_configured": "This Cellarion account is already configured.",
+      "reauth_successful": "Re-authentication was successful."
     }
   },
   "options": {

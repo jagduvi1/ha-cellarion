@@ -15,8 +15,7 @@ from homeassistant.components.sensor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.device_registry import DeviceEntryType
-from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -49,7 +48,8 @@ SENSOR_DESCRIPTIONS: tuple[CellarionSensorDescription, ...] = (
         key="collection_value",
         translation_key="collection_value",
         icon="mdi:cash-multiple",
-        state_class=SensorStateClass.MEASUREMENT,
+        # MONETARY only allows TOTAL — MEASUREMENT logs a validation error
+        state_class=SensorStateClass.TOTAL,
         device_class=SensorDeviceClass.MONETARY,
         value_fn=lambda d: _get_overview(d, "totalValue", 0),
         extra_attrs_fn=lambda d: {
@@ -118,6 +118,10 @@ SENSOR_DESCRIPTIONS: tuple[CellarionSensorDescription, ...] = (
         extra_attrs_fn=lambda d: {
             "urgent_bottles": [
                 {
+                    # id is present on servers that include it in the
+                    # urgency ladder; enables consume-from-card and the
+                    # cellarion.consume_bottle service in automations
+                    "id": b.get("id"),
                     "name": b.get("name"),
                     "vintage": b.get("vintage"),
                     "status": b.get("status"),
@@ -238,6 +242,9 @@ SENSOR_DESCRIPTIONS: tuple[CellarionSensorDescription, ...] = (
         icon="mdi:server",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: d.get("health", "unknown"),
+        extra_attrs_fn=lambda d: {
+            "instance_url": d.get("instance_url"),
+        },
     ),
 )
 

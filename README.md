@@ -39,12 +39,21 @@ Your wine data stays in Cellarion. This integration reads from the Cellarion API
 1. Go to **Settings** > **Devices & Services** > **Add Integration**
 2. Search for **Cellarion**
 3. Enter your Cellarion instance URL (default: `https://cellarion.app`)
-4. Enter your email and password
+4. Enter your email (or username) and password
 5. Done! Sensors will appear under the **Cellarion** device
 
 ### Options
 
 After setup, you can adjust the polling interval (default: 30 minutes) via the integration's options.
+
+### How updates arrive
+
+The integration polls your Cellarion instance on the configured interval.
+On servers that support the push event stream (`/api/events/stream`), it
+also holds an outbound connection and updates sensors within seconds of a
+change, relaxing polling to a 6-hour safety net. This is detected
+automatically — no configuration, and your Home Assistant never needs to
+be reachable from the internet.
 
 ## Sensors
 
@@ -73,6 +82,23 @@ After setup, you can adjust the polling interval (default: 30 minutes) via the i
 | Service status | Cellarion instance health | — |
 
 ## Dashboard Examples
+
+### Cellarion Card (bundled)
+
+The integration ships with a custom Lovelace card and registers it
+automatically — no extra install. Add it from the dashboard card picker
+(**Custom: Cellarion Card**) or in YAML:
+
+```yaml
+type: custom:cellarion-card
+title: Wine Cellar          # optional
+prefix: sensor.cellarion    # optional — entity id prefix
+```
+
+It shows your collection stats, a drink-window distribution bar, and the
+bottles that need attention. Clicking any number opens the sensor's
+more-info dialog. If your dashboards run in YAML mode, add
+`/cellarion-files/cellarion-card.js` as a module resource manually.
 
 ### Simple Entities Card
 
@@ -109,6 +135,20 @@ automation:
 
 - Home Assistant 2024.1 or newer
 - A Cellarion account (hosted or self-hosted)
+
+## Development
+
+A Docker-based Home Assistant test environment lives in [dev/](dev/):
+
+```bash
+cd dev
+docker compose up -d
+```
+
+Open http://localhost:8123, create a user, and add the Cellarion integration.
+The container joins the local Cellarion compose network, so use
+`http://cellarion-backend:5000` as the instance URL. After changing the
+integration code, run `docker compose restart homeassistant`.
 
 ## License
 
