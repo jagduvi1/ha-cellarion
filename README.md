@@ -41,9 +41,15 @@ Your wine data stays in your Cellarion account. This integration reads from the 
 
 1. Go to **Settings** > **Devices & Services** > **Add Integration**
 2. Search for **Cellarion**
-3. Enter your Cellarion instance URL (default: `https://cellarion.app`)
-4. Enter your email (or username) and password
-5. Done! Sensors will appear under the **Cellarion** device
+3. Pick an authentication method:
+   - **API token (recommended)** — create one in Cellarion under
+     **Settings → API tokens** with the `read` and `consume` scopes and
+     paste it in. Your password never touches Home Assistant.
+   - **Email & password** — on current Cellarion servers this mints a
+     scoped API token for Home Assistant automatically and does **not**
+     store your password. (Older self-hosted servers fall back to
+     password login.)
+4. Done! Sensors will appear under the **Cellarion** device
 
 ### Options
 

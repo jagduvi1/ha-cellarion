@@ -3,17 +3,34 @@
     "step": {
       "user": {
         "title": "Connect to Cellarion",
-        "description": "Enter your Cellarion instance URL and login credentials.",
-        "data": {
-          "url": "URL",
-          "email": "Email or username",
-          "password": "Password"
+        "description": "How do you want to authenticate?",
+        "menu_options": {
+          "token": "API token (recommended)",
+          "password": "Email & password"
         }
       },
       "reauth_confirm": {
         "title": "Re-authenticate with Cellarion",
-        "description": "The password for {email} is no longer valid. Enter the new password.",
+        "description": "Your Cellarion credentials are no longer valid. How do you want to re-authenticate?",
+        "menu_options": {
+          "token": "API token (recommended)",
+          "password": "Email & password"
+        }
+      },
+      "token": {
+        "title": "Connect with an API token",
+        "description": "Create a token with the read and consume scopes in Cellarion under Settings → API tokens, then paste it here.",
         "data": {
+          "url": "URL",
+          "token": "API token"
+        }
+      },
+      "password": {
+        "title": "Connect with email & password",
+        "description": "On Cellarion servers with API-token support, a scoped token is created for Home Assistant and your password is not stored.",
+        "data": {
+          "url": "URL",
+          "email": "Email or username",
           "password": "Password"
         }
       }
@@ -21,6 +38,8 @@
     "error": {
       "cannot_connect": "Unable to connect to Cellarion. Check the URL.",
       "invalid_auth": "Invalid email or password.",
+      "invalid_token": "This API token was not accepted (revoked or mistyped).",
+      "token_scope": "This API token is missing the read scope. Create one with both the read and consume scopes.",
       "unknown": "An unexpected error occurred."
     },
     "abort": {
