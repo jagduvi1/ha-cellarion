@@ -27,3 +27,14 @@ jobs:
           # home-assistant/brands no longer accepts custom integrations;
           # icons ship in custom_components/cellarion/brand/ (HA 2026.3+)
           ignore: brands
+
+  tests:
+    name: tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install pytest-homeassistant-custom-component
+      - run: pytest tests -q
