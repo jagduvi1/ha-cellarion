@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import logging
-from functools import partial
 from pathlib import Path
 
 import voluptuous as vol
 
-from homeassistant.config_entries import ConfigEntry
+from homeassistant.config_entries import ConfigEntry, ConfigEntryState
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.exceptions import (
@@ -18,6 +17,7 @@ from homeassistant.exceptions import (
 )
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.typing import ConfigType
 from homeassistant.loader import async_get_integration
 
 from .api import (
@@ -43,6 +43,8 @@ _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = [Platform.SENSOR]
 
+CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
+
 FRONTEND_URL_BASE = "/cellarion-files"
 CARD_FILENAME = "cellarion-card.js"
 
@@ -61,24 +63,38 @@ SERVICE_CONSUME_SCHEMA = vol.Schema(
     }
 )
 
+type CellarionConfigEntry = ConfigEntry[CellarionCoordinator]
+
 
 async def _async_consume_bottle(hass: HomeAssistant, call: ServiceCall) -> None:
     """Handle the cellarion.consume_bottle service."""
-    coordinators: dict[str, CellarionCoordinator] = hass.data.get(DOMAIN, {})
-    if not coordinators:
-        raise ServiceValidationError("No Cellarion accounts are configured")
-
-    if entry_id := call.data.get("entry_id"):
-        coordinator = coordinators.get(entry_id)
-        if coordinator is None:
-            raise ServiceValidationError(f"Unknown config entry: {entry_id}")
-    elif len(coordinators) == 1:
-        coordinator = next(iter(coordinators.values()))
-    else:
+    entries: list[CellarionConfigEntry] = [
+        entry
+        for entry in hass.config_entries.async_entries(DOMAIN)
+        if entry.state is ConfigEntryState.LOADED
+    ]
+    if not entries:
         raise ServiceValidationError(
-            "Multiple Cellarion accounts are configured; pass entry_id"
+            translation_domain=DOMAIN, translation_key="no_accounts"
         )
 
+    if entry_id := call.data.get("entry_id"):
+        matches = [entry for entry in entries if entry.entry_id == entry_id]
+        if not matches:
+            raise ServiceValidationError(
+                translation_domain=DOMAIN,
+                translation_key="unknown_entry",
+                translation_placeholders={"entry_id": entry_id},
+            )
+        entry = matches[0]
+    elif len(entries) == 1:
+        entry = entries[0]
+    else:
+        raise ServiceValidationError(
+            translation_domain=DOMAIN, translation_key="multiple_accounts"
+        )
+
+    coordinator = entry.runtime_data
     try:
         await coordinator.client.consume_bottle(
             call.data["bottle_id"],
@@ -87,9 +103,28 @@ async def _async_consume_bottle(hass: HomeAssistant, call: ServiceCall) -> None:
             note=call.data.get("note"),
         )
     except CellarionApiError as err:
-        raise HomeAssistantError(f"Could not consume bottle: {err}") from err
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="consume_failed",
+            translation_placeholders={"error": str(err)},
+        ) from err
 
     await coordinator.async_request_refresh()
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Register services; they exist even before an entry is configured."""
+
+    async def _handle_consume(call: ServiceCall) -> None:
+        await _async_consume_bottle(hass, call)
+
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_CONSUME_BOTTLE,
+        _handle_consume,
+        schema=SERVICE_CONSUME_SCHEMA,
+    )
+    return True
 
 
 async def _async_register_card(hass: HomeAssistant) -> None:
@@ -159,7 +194,7 @@ async def _async_register_card(hass: HomeAssistant) -> None:
 
 
 async def _async_migrate_to_token(
-    hass: HomeAssistant, entry: ConfigEntry, client: CellarionApiClient
+    hass: HomeAssistant, entry: CellarionConfigEntry, client: CellarionApiClient
 ) -> CellarionApiClient | None:
     """Swap a legacy stored password for a scoped API token (one-time).
 
@@ -178,7 +213,11 @@ async def _async_migrate_to_token(
         # Stored password no longer valid — go straight to reauth instead
         # of failing again on the first refresh (fewer login attempts,
         # Cellarion counts them toward account lockout)
-        raise ConfigEntryAuthFailed(f"Stored password rejected: {err}") from err
+        raise ConfigEntryAuthFailed(
+            translation_domain=DOMAIN,
+            translation_key="auth_failed",
+            translation_placeholders={"error": str(err)},
+        ) from err
     except CellarionApiError as err:
         _LOGGER.debug("Token migration postponed: %s", err)
         return None
@@ -203,7 +242,9 @@ async def _async_migrate_to_token(
     )
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_setup_entry(
+    hass: HomeAssistant, entry: CellarionConfigEntry
+) -> bool:
     """Set up Cellarion from a config entry."""
     await _async_register_card(hass)
 
@@ -229,15 +270,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
     await coordinator.async_config_entry_first_refresh()
 
-    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
-
-    if not hass.services.has_service(DOMAIN, SERVICE_CONSUME_BOTTLE):
-        hass.services.async_register(
-            DOMAIN,
-            SERVICE_CONSUME_BOTTLE,
-            partial(_async_consume_bottle, hass),
-            schema=SERVICE_CONSUME_SCHEMA,
-        )
+    entry.runtime_data = coordinator
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     entry.async_create_background_task(
@@ -250,18 +283,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def _async_update_listener(
-    hass: HomeAssistant, entry: ConfigEntry
+    hass: HomeAssistant, entry: CellarionConfigEntry
 ) -> None:
     """Handle options update — reload the integration."""
     await hass.config_entries.async_reload(entry.entry_id)
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_unload_entry(
+    hass: HomeAssistant, entry: CellarionConfigEntry
+) -> bool:
     """Unload a config entry."""
-    if unload_ok := await hass.config_entries.async_unload_platforms(
-        entry, PLATFORMS
-    ):
-        hass.data[DOMAIN].pop(entry.entry_id)
-        if not hass.data[DOMAIN]:
-            hass.services.async_remove(DOMAIN, SERVICE_CONSUME_BOTTLE)
-    return unload_ok
+    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)

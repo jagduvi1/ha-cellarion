@@ -1,0 +1,30 @@
+{
+  "entity": {
+    "sensor": {
+      "total_bottles": { "default": "mdi:bottle-wine" },
+      "collection_value": { "default": "mdi:cash-multiple" },
+      "unique_wines": { "default": "mdi:glass-wine" },
+      "cellar_count": { "default": "mdi:warehouse" },
+      "average_rating": { "default": "mdi:star" },
+      "countries": { "default": "mdi:earth" },
+      "bottles_at_peak": { "default": "mdi:glass-cocktail" },
+      "bottles_declining": { "default": "mdi:alert-circle" },
+      "bottles_not_ready": { "default": "mdi:timer-sand" },
+      "bottles_early": { "default": "mdi:sprout" },
+      "bottles_late": { "default": "mdi:clock-alert" },
+      "consumed_bottles": { "default": "mdi:bottle-wine-outline" },
+      "intake_per_year": { "default": "mdi:trending-up" },
+      "runway_years": { "default": "mdi:road-variant" },
+      "oldest_vintage": { "default": "mdi:calendar-arrow-left" },
+      "newest_vintage": { "default": "mdi:calendar-arrow-right" },
+      "health_score": { "default": "mdi:heart-pulse" },
+      "unread_notifications": { "default": "mdi:bell" },
+      "wine_types": { "default": "mdi:format-list-bulleted" },
+      "top_producers": { "default": "mdi:domain" },
+      "service_health": { "default": "mdi:server" }
+    }
+  },
+  "services": {
+    "consume_bottle": { "service": "mdi:glass-wine" }
+  }
+}

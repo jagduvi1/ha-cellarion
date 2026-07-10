@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -12,15 +12,18 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN
 from .coordinator import CellarionCoordinator
+from .entity import CellarionEntity
+
+if TYPE_CHECKING:
+    from . import CellarionConfigEntry
+
+# Read-only coordinator entities — no request throttling needed
+PARALLEL_UPDATES = 0
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -40,14 +43,12 @@ SENSOR_DESCRIPTIONS: tuple[CellarionSensorDescription, ...] = (
     CellarionSensorDescription(
         key="total_bottles",
         translation_key="total_bottles",
-        icon="mdi:bottle-wine",
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda d: _get_overview(d, "totalBottles", 0),
     ),
     CellarionSensorDescription(
         key="collection_value",
         translation_key="collection_value",
-        icon="mdi:cash-multiple",
         # MONETARY only allows TOTAL — MEASUREMENT logs a validation error
         state_class=SensorStateClass.TOTAL,
         device_class=SensorDeviceClass.MONETARY,
@@ -60,14 +61,12 @@ SENSOR_DESCRIPTIONS: tuple[CellarionSensorDescription, ...] = (
     CellarionSensorDescription(
         key="unique_wines",
         translation_key="unique_wines",
-        icon="mdi:glass-wine",
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda d: _get_overview(d, "uniqueWines", 0),
     ),
     CellarionSensorDescription(
         key="cellar_count",
         translation_key="cellar_count",
-        icon="mdi:warehouse",
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda d: d.get("cellar_count", 0),
         extra_attrs_fn=lambda d: {
@@ -80,7 +79,6 @@ SENSOR_DESCRIPTIONS: tuple[CellarionSensorDescription, ...] = (
     CellarionSensorDescription(
         key="average_rating",
         translation_key="average_rating",
-        icon="mdi:star",
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda d: (
             round(_get_overview(d, "avgRating"), 1)
@@ -91,8 +89,8 @@ SENSOR_DESCRIPTIONS: tuple[CellarionSensorDescription, ...] = (
     CellarionSensorDescription(
         key="countries",
         translation_key="countries",
-        icon="mdi:earth",
         state_class=SensorStateClass.MEASUREMENT,
+        entity_registry_enabled_default=False,
         value_fn=lambda d: _get_overview(d, "totalCountries", 0),
         extra_attrs_fn=lambda d: {
             "top_countries": [
@@ -105,7 +103,6 @@ SENSOR_DESCRIPTIONS: tuple[CellarionSensorDescription, ...] = (
     CellarionSensorDescription(
         key="bottles_at_peak",
         translation_key="bottles_at_peak",
-        icon="mdi:glass-cocktail",
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda d: d.get("maturity", {}).get("peak", 0),
         extra_attrs_fn=lambda d: {
@@ -115,7 +112,6 @@ SENSOR_DESCRIPTIONS: tuple[CellarionSensorDescription, ...] = (
     CellarionSensorDescription(
         key="bottles_declining",
         translation_key="bottles_declining",
-        icon="mdi:alert-circle",
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda d: d.get("maturity", {}).get("declining", 0),
         extra_attrs_fn=lambda d: {
@@ -136,21 +132,18 @@ SENSOR_DESCRIPTIONS: tuple[CellarionSensorDescription, ...] = (
     CellarionSensorDescription(
         key="bottles_not_ready",
         translation_key="bottles_not_ready",
-        icon="mdi:timer-sand",
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda d: d.get("maturity", {}).get("notReady", 0),
     ),
     CellarionSensorDescription(
         key="bottles_early",
         translation_key="bottles_early",
-        icon="mdi:sprout",
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda d: d.get("maturity", {}).get("early", 0),
     ),
     CellarionSensorDescription(
         key="bottles_late",
         translation_key="bottles_late",
-        icon="mdi:clock-alert",
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda d: d.get("maturity", {}).get("late", 0),
     ),
@@ -158,7 +151,6 @@ SENSOR_DESCRIPTIONS: tuple[CellarionSensorDescription, ...] = (
     CellarionSensorDescription(
         key="consumed_bottles",
         translation_key="consumed_bottles",
-        icon="mdi:bottle-wine-outline",
         state_class=SensorStateClass.TOTAL_INCREASING,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: _get_overview(d, "totalConsumed", 0),
@@ -166,7 +158,6 @@ SENSOR_DESCRIPTIONS: tuple[CellarionSensorDescription, ...] = (
     CellarionSensorDescription(
         key="intake_per_year",
         translation_key="intake_per_year",
-        icon="mdi:trending-up",
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: (
@@ -176,7 +167,6 @@ SENSOR_DESCRIPTIONS: tuple[CellarionSensorDescription, ...] = (
     CellarionSensorDescription(
         key="runway_years",
         translation_key="runway_years",
-        icon="mdi:road-variant",
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: (
@@ -189,20 +179,19 @@ SENSOR_DESCRIPTIONS: tuple[CellarionSensorDescription, ...] = (
     CellarionSensorDescription(
         key="oldest_vintage",
         translation_key="oldest_vintage",
-        icon="mdi:calendar-arrow-left",
+        entity_registry_enabled_default=False,
         value_fn=lambda d: _get_overview(d, "oldestVintage"),
     ),
     CellarionSensorDescription(
         key="newest_vintage",
         translation_key="newest_vintage",
-        icon="mdi:calendar-arrow-right",
+        entity_registry_enabled_default=False,
         value_fn=lambda d: _get_overview(d, "newestVintage"),
     ),
     # ── Health score ─────────────────────────────────────────────────
     CellarionSensorDescription(
         key="health_score",
         translation_key="health_score",
-        icon="mdi:heart-pulse",
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda d: _get_overview(d, "healthScore"),
         extra_attrs_fn=lambda d: {
@@ -213,7 +202,6 @@ SENSOR_DESCRIPTIONS: tuple[CellarionSensorDescription, ...] = (
     CellarionSensorDescription(
         key="unread_notifications",
         translation_key="unread_notifications",
-        icon="mdi:bell",
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda d: d.get("unread_count", 0),
     ),
@@ -221,7 +209,7 @@ SENSOR_DESCRIPTIONS: tuple[CellarionSensorDescription, ...] = (
     CellarionSensorDescription(
         key="wine_types",
         translation_key="wine_types",
-        icon="mdi:format-list-bulleted",
+        entity_registry_enabled_default=False,
         value_fn=lambda d: len(d.get("by_type", {})),
         extra_attrs_fn=lambda d: d.get("by_type", {}),
     ),
@@ -229,7 +217,7 @@ SENSOR_DESCRIPTIONS: tuple[CellarionSensorDescription, ...] = (
     CellarionSensorDescription(
         key="top_producers",
         translation_key="top_producers",
-        icon="mdi:domain",
+        entity_registry_enabled_default=False,
         value_fn=lambda d: len(d.get("top_producers", [])),
         extra_attrs_fn=lambda d: {
             "producers": [
@@ -242,7 +230,6 @@ SENSOR_DESCRIPTIONS: tuple[CellarionSensorDescription, ...] = (
     CellarionSensorDescription(
         key="service_health",
         translation_key="service_health",
-        icon="mdi:server",
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: d.get("health", "unknown"),
         extra_attrs_fn=lambda d: {
@@ -254,43 +241,32 @@ SENSOR_DESCRIPTIONS: tuple[CellarionSensorDescription, ...] = (
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: CellarionConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Cellarion sensors from a config entry."""
-    coordinator: CellarionCoordinator = hass.data[DOMAIN][entry.entry_id]
+    coordinator = entry.runtime_data
 
-    entities = [
-        CellarionSensor(coordinator, description, entry)
+    async_add_entities(
+        CellarionSensor(coordinator, description, entry.entry_id)
         for description in SENSOR_DESCRIPTIONS
-    ]
-    async_add_entities(entities)
+    )
 
 
-class CellarionSensor(
-    CoordinatorEntity[CellarionCoordinator], SensorEntity
-):
+class CellarionSensor(CellarionEntity, SensorEntity):
     """Representation of a Cellarion sensor."""
 
     entity_description: CellarionSensorDescription
-    _attr_has_entity_name = True
 
     def __init__(
         self,
         coordinator: CellarionCoordinator,
         description: CellarionSensorDescription,
-        entry: ConfigEntry,
+        entry_id: str,
     ) -> None:
-        super().__init__(coordinator)
+        super().__init__(coordinator, entry_id)
         self.entity_description = description
-        self._attr_unique_id = f"{entry.entry_id}_{description.key}"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)},
-            name="Cellarion",
-            manufacturer="Cellarion",
-            entry_type=DeviceEntryType.SERVICE,
-            configuration_url=entry.data.get("url", "https://cellarion.app"),
-        )
+        self._attr_unique_id = f"{entry_id}_{description.key}"
 
     @property
     def native_value(self) -> Any:
