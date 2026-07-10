@@ -146,6 +146,13 @@ class CellarionCard extends HTMLElement {
       ?.urgent_bottles || []).slice(0, 5);
     const ready = (this._state("_bottles_at_peak")?.attributes
       ?.peak_bottles || []).slice(0, 5);
+    const link = this._config.url
+      || this._state("_service_status")?.attributes?.instance_url;
+    const urgentTotal = (this._num("_bottles_declining") ?? 0)
+      + (this._num("_bottles_late_window") ?? 0);
+    const moreLine = (total, shown) => total > shown ? (link
+      ? `<a class="more" href="${esc(link)}" target="_blank" rel="noopener">+ ${total - shown} more in Cellarion</a>`
+      : `<div class="more">+ ${total - shown} more</div>`) : "";
 
     const healthColor = health == null ? "var(--secondary-text-color)"
       : health >= 80 ? "#059669" : health >= 60 ? "#D97706" : "#DC2626";
@@ -182,6 +189,7 @@ class CellarionCard extends HTMLElement {
             ${b.drink_to ? `<span class="vintage">until ${esc(b.drink_to)}</span>` : ""}
             ${consumeBtn(b)}
           </div>`).join("")}
+        ${moreLine(peak, ready.length)}
       </div>` : "";
 
     const urgentHtml = urgent.length ? `
@@ -195,6 +203,7 @@ class CellarionCard extends HTMLElement {
             <span class="status" style="background:${STATUS_COLOR[b.status] || "#D97706"}1a;color:${STATUS_COLOR[b.status] || "#D97706"}">${esc(b.status)}</span>
             ${consumeBtn(b)}
           </div>`).join("")}
+        ${moreLine(urgentTotal, urgent.length)}
       </div>` : "";
 
     const serviceMsg =
@@ -223,6 +232,9 @@ class CellarionCard extends HTMLElement {
                  border:1px solid var(--secondary-text-color); background:none;
                  color:var(--secondary-text-color); cursor:pointer; padding:0; }
         .consume:hover { border-color:#059669; color:#059669; }
+        .more { display:block; font-size:0.8em; color:var(--secondary-text-color);
+                margin-top:2px; text-decoration:none; }
+        a.more:hover { text-decoration:underline; }
         .health { display:flex; align-items:baseline; gap:6px; cursor:pointer;
                   font-weight:600; color:${healthColor}; }
         .health .grade { font-size:0.8em; border:1px solid ${healthColor};
@@ -259,14 +271,10 @@ class CellarionCard extends HTMLElement {
       </style>
       <ha-card>
         <div class="head">
-          ${(() => {
-            const link = this._config.url
-              || this._state("_service_status")?.attributes?.instance_url;
-            return link
-              ? `<a class="title" href="${esc(link)}" target="_blank"
-                    rel="noopener" title="Open Cellarion">${esc(this._config.title)}<span class="ext">↗</span></a>`
-              : `<div class="title">${esc(this._config.title)}</div>`;
-          })()}
+          ${link
+            ? `<a class="title" href="${esc(link)}" target="_blank"
+                  rel="noopener" title="Open Cellarion">${esc(this._config.title)}<span class="ext">↗</span></a>`
+            : `<div class="title">${esc(this._config.title)}</div>`}
           ${health != null ? `
             <div class="health" data-entity="${esc(this._config.prefix)}_collection_health_score">
               <span>${health}</span>
