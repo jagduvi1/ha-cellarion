@@ -144,6 +144,8 @@ class CellarionCard extends HTMLElement {
 
     const urgent = (this._state("_bottles_declining")?.attributes
       ?.urgent_bottles || []).slice(0, 5);
+    const ready = (this._state("_bottles_at_peak")?.attributes
+      ?.peak_bottles || []).slice(0, 5);
 
     const healthColor = health == null ? "var(--secondary-text-color)"
       : health >= 80 ? "#059669" : health >= 60 ? "#D97706" : "#DC2626";
@@ -163,6 +165,25 @@ class CellarionCard extends HTMLElement {
           <span class="cnt">${c.count}</span>
         </div>`).join("");
 
+    const consumeBtn = (b) => b.id ? `
+            <button class="consume" data-bottle="${esc(b.id)}"
+                    data-name="${esc(b.name)}" title="Mark as drunk">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>
+            </button>` : "";
+
+    const readyHtml = ready.length ? `
+      <div class="section-label">Ready to drink</div>
+      <div class="urgent">
+        ${ready.map((b) => `
+          <div class="bottle">
+            <ha-icon icon="mdi:bottle-wine"></ha-icon>
+            <span class="bname">${esc(b.name)}</span>
+            <span class="vintage">${esc(b.vintage)}</span>
+            ${b.drink_to ? `<span class="vintage">until ${esc(b.drink_to)}</span>` : ""}
+            ${consumeBtn(b)}
+          </div>`).join("")}
+      </div>` : "";
+
     const urgentHtml = urgent.length ? `
       <div class="section-label">Drink soon</div>
       <div class="urgent">
@@ -172,11 +193,7 @@ class CellarionCard extends HTMLElement {
             <span class="bname">${esc(b.name)}</span>
             <span class="vintage">${esc(b.vintage)}</span>
             <span class="status" style="background:${STATUS_COLOR[b.status] || "#D97706"}1a;color:${STATUS_COLOR[b.status] || "#D97706"}">${esc(b.status)}</span>
-            ${b.id ? `
-            <button class="consume" data-bottle="${esc(b.id)}"
-                    data-name="${esc(b.name)}" title="Mark as drunk">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>
-            </button>` : ""}
+            ${consumeBtn(b)}
           </div>`).join("")}
       </div>` : "";
 
@@ -264,6 +281,7 @@ class CellarionCard extends HTMLElement {
         <div class="section-label">Drink window${maturityTotal ? ` · ${maturityTotal} bottles` : ""}</div>
         <div class="bar">${bar}</div>
         <div class="legend">${legend}</div>
+        ${readyHtml}
         ${urgentHtml}
         ${serviceHtml}
       </ha-card>`;

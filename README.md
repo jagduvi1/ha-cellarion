@@ -90,7 +90,7 @@ the internet.
 | Cellars | Number of cellars | per-cellar breakdown |
 | Average rating | Mean rating across bottles | — |
 | Countries | Countries represented | top 5 countries |
-| Bottles at peak | Ready to drink now | — |
+| Bottles at peak | Ready to drink now | ready-to-drink list (top 10, with ids) |
 | Bottles declining | Past peak, drink soon! | urgent bottles list |
 | Bottles not ready | Too young to open | — |
 | Bottles early window | Approaching peak | — |
@@ -155,12 +155,15 @@ title: Wine Cellar          # optional
 prefix: sensor.cellarion    # optional — entity id prefix
 ```
 
-It shows your collection stats, a drink-window distribution bar, and the
-bottles that need attention. Clicking any number opens the sensor's
-more-info dialog, the card title opens your Cellarion instance, and — on
-Cellarion v1.75+ — each urgent bottle gets a one-tap consume button
-(with confirmation). If your dashboards run in YAML mode, add
-`/cellarion-files/cellarion-card.js` as a module resource manually.
+It shows your collection stats, a drink-window distribution bar, a
+**Ready to drink** list (bottles at their peak, soonest-closing window
+first), and a **Drink soon** list (declining/late bottles). Clicking any
+number opens the sensor's more-info dialog, the card title opens your
+Cellarion instance, and — on Cellarion v1.75+ — every listed bottle gets
+a one-tap consume button (with confirmation). For browsing your full
+inventory, follow the card link into Cellarion itself. If your
+dashboards run in YAML mode, add `/cellarion-files/cellarion-card.js`
+as a module resource manually.
 
 ### Simple Entities Card
 
