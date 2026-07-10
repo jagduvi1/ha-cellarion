@@ -1,0 +1,31 @@
+# Home Assistant test environment for the Cellarion integration.
+#
+# Usage (from the dev/ directory):
+#   docker compose up -d
+#   open http://localhost:8123 — create the HA user, then add the
+#   Cellarion integration with URL http://cellarion-backend:5000
+#
+# The container joins the local Cellarion compose network so the
+# integration can talk straight to the backend container.
+# After editing the integration code, restart HA:
+#   docker compose restart homeassistant
+
+services:
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    container_name: ha-cellarion-test
+    ports:
+      - "8123:8123"
+    volumes:
+      - ./ha-config:/config
+      - ../custom_components/cellarion:/config/custom_components/cellarion:ro
+    environment:
+      - TZ=Europe/Stockholm
+    restart: unless-stopped
+    networks:
+      - cellarion
+
+networks:
+  cellarion:
+    name: cellarion-main_default
+    external: true

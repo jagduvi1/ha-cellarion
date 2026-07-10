@@ -13,3 +13,4 @@ venv/
 .vscode/
 *.swp
 *.swo
+dev/ha-config/
