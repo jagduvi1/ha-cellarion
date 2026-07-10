@@ -200,6 +200,12 @@ class CellarionApiClient:
             raise CellarionApiError("No token in creation response")
         return token
 
+    async def get_peak_bottles(self, limit: int = 10) -> dict:
+        """Fetch bottles currently in their peak drink window."""
+        return await self._request(
+            "GET", f"/api/bottles?maturity=peak&limit={limit}"
+        )
+
     async def consume_bottle(
         self,
         bottle_id: str,

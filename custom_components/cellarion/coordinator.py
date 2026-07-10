@@ -49,6 +49,13 @@ class CellarionCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             cellars_data = await self.client.get_cellars()
             notifications_data = await self.client.get_notifications()
             health_data = await self.client.get_health()
+            # Best-effort: powers the "ready to drink" list; a failure here
+            # (e.g. older self-hosted server) must not break the sensors
+            try:
+                peak_data = await self.client.get_peak_bottles()
+            except CellarionApiError as err:
+                _LOGGER.debug("Peak bottles unavailable: %s", err)
+                peak_data = {}
         except CellarionScopeError as err:
             # Token valid but missing the read scope — user must provide a
             # properly scoped token; the reauth flow lets them do that.
@@ -67,6 +74,22 @@ class CellarionCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         maturity = stats.get("maturity", {})
         pace = stats.get("pace", {})
 
+        peak_items = peak_data.get("bottles", {}).get("items", [])
+        peak_bottles = sorted(
+            (
+                {
+                    "id": b.get("_id"),
+                    "name": (b.get("wineDefinition") or {}).get("name", "Unknown"),
+                    "producer": (b.get("wineDefinition") or {}).get("producer", ""),
+                    "vintage": b.get("vintage") or "NV",
+                    "drink_to": b.get("drinkTo"),
+                }
+                for b in peak_items
+            ),
+            # Drink first what leaves its window first
+            key=lambda x: (x["drink_to"] is None, x["drink_to"]),
+        )
+
         return {
             "overview": overview,
             "maturity": maturity,
@@ -82,4 +105,5 @@ class CellarionCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "unread_count": notifications_data.get("unreadCount", 0),
             "health": health_data.get("status", "unknown"),
             "instance_url": self.url,
+            "peak_bottles": peak_bottles,
         }

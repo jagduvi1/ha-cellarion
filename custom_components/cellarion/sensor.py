@@ -108,6 +108,9 @@ SENSOR_DESCRIPTIONS: tuple[CellarionSensorDescription, ...] = (
         icon="mdi:glass-cocktail",
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda d: d.get("maturity", {}).get("peak", 0),
+        extra_attrs_fn=lambda d: {
+            "peak_bottles": d.get("peak_bottles", []),
+        },
     ),
     CellarionSensorDescription(
         key="bottles_declining",
