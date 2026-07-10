@@ -9,9 +9,12 @@ Your wine data stays in Cellarion. This integration reads from the Cellarion API
 
 ## Features
 
+- **Dashboard card included** — a ready-made card with collection stats, a drink-window bar, and the bottles that need attention; no extra install
 - **Collection overview** — total bottles, value, unique wines, average rating
 - **Drink window tracking** — bottles at peak, declining, not ready, early/late window
 - **Maturity alerts** — urgent bottles listed as sensor attributes
+- **Consume from Home Assistant** — mark bottles drank/gifted/sold via the `cellarion.consume_bottle` service, from the card, automations, or NFC tags
+- **Instant updates** — on Cellarion servers with push support, sensors update within seconds of a change (automatic, no ports to open)
 - **Pace & runway** — intake per year, years until your cellar is empty
 - **Cellar breakdown** — per-cellar bottle counts and values
 - **Wine types & producers** — breakdown by type, top producers
@@ -81,7 +84,42 @@ be reachable from the internet.
 | Top producers | Number of top producers | producer list (top 10) |
 | Service status | Cellarion instance health | — |
 
+## Services
+
+### `cellarion.consume_bottle`
+
+Mark a bottle as consumed in Cellarion — frees its rack slot and updates
+your statistics, exactly like consuming it in the app.
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `bottle_id` | yes | The Cellarion bottle id |
+| `reason` | no | `drank` (default), `gifted`, `sold`, or `other` |
+| `rating` | no | Rating to record with the consumption |
+| `note` | no | Tasting note or comment |
+| `entry_id` | no | Only when multiple Cellarion accounts are configured |
+
+Example — log a bottle by scanning an NFC tag on its rack slot:
+
+```yaml
+automation:
+  - alias: "NFC: consume bottle"
+    trigger:
+      - platform: tag
+        tag_id: rack-a1        # write the bottle id into the tag's automation
+    action:
+      - service: cellarion.consume_bottle
+        data:
+          bottle_id: "6a50805b785f507654afdc78"
+          reason: drank
+```
+
 ## Dashboard Examples
+
+> **Home Assistant 2026+:** the default **Overview** dashboard is
+> auto-generated and doesn't accept custom cards. Create your own under
+> **Settings → Dashboards → Add dashboard → New dashboard from scratch**,
+> then add cards there.
 
 ### Cellarion Card (bundled)
 
@@ -97,8 +135,11 @@ prefix: sensor.cellarion    # optional — entity id prefix
 
 It shows your collection stats, a drink-window distribution bar, and the
 bottles that need attention. Clicking any number opens the sensor's
-more-info dialog. If your dashboards run in YAML mode, add
-`/cellarion-files/cellarion-card.js` as a module resource manually.
+more-info dialog, the card title opens your Cellarion instance, and — on
+Cellarion servers that expose bottle ids — each urgent bottle gets a
+one-tap consume button (with confirmation). If your dashboards run in
+YAML mode, add `/cellarion-files/cellarion-card.js` as a module resource
+manually.
 
 ### Simple Entities Card
 
