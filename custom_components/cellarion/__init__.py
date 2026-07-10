@@ -11,13 +11,31 @@ import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall
-from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.exceptions import (
+    ConfigEntryAuthFailed,
+    HomeAssistantError,
+    ServiceValidationError,
+)
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.loader import async_get_integration
 
-from .api import CellarionApiClient, CellarionApiError
-from .const import CONF_EMAIL, CONF_PASSWORD, CONF_SCAN_INTERVAL, CONF_TOKEN, CONF_URL, DEFAULT_SCAN_INTERVAL, DOMAIN
+from .api import (
+    CellarionApiClient,
+    CellarionApiError,
+    CellarionAuthError,
+    CellarionTokensNotSupported,
+)
+from .const import (
+    CONF_EMAIL,
+    CONF_PASSWORD,
+    CONF_SCAN_INTERVAL,
+    CONF_TOKEN,
+    CONF_URL,
+    DEFAULT_SCAN_INTERVAL,
+    DOMAIN,
+    TOKEN_SCOPES,
+)
 from .coordinator import CellarionCoordinator
 from .push import async_push_listener
 
@@ -140,6 +158,51 @@ async def _async_register_card(hass: HomeAssistant) -> None:
         )
 
 
+async def _async_migrate_to_token(
+    hass: HomeAssistant, entry: ConfigEntry, client: CellarionApiClient
+) -> CellarionApiClient | None:
+    """Swap a legacy stored password for a scoped API token (one-time).
+
+    Returns a token-based client on success. Returns None to keep the
+    password client: either the server has no token support (older
+    self-hosted) or it is temporarily unreachable — in that case setup
+    proceeds normally and migration is retried on the next reload.
+    """
+    try:
+        name = f"Home Assistant ({hass.config.location_name})"
+        token = await client.async_create_api_token(name[:60], TOKEN_SCOPES)
+    except CellarionTokensNotSupported:
+        _LOGGER.debug("Server has no API-token support; keeping password auth")
+        return None
+    except CellarionAuthError as err:
+        # Stored password no longer valid — go straight to reauth instead
+        # of failing again on the first refresh (fewer login attempts,
+        # Cellarion counts them toward account lockout)
+        raise ConfigEntryAuthFailed(f"Stored password rejected: {err}") from err
+    except CellarionApiError as err:
+        _LOGGER.debug("Token migration postponed: %s", err)
+        return None
+
+    data = {
+        CONF_URL: entry.data[CONF_URL],
+        CONF_EMAIL: entry.data.get(CONF_EMAIL),
+        CONF_TOKEN: token,
+    }
+    hass.config_entries.async_update_entry(
+        entry, data={k: v for k, v in data.items() if v is not None}
+    )
+    _LOGGER.info(
+        "Migrated Cellarion to a scoped API token; the account password "
+        "is no longer stored in Home Assistant"
+    )
+    return CellarionApiClient(
+        session=async_get_clientsession(hass),
+        url=entry.data[CONF_URL],
+        email=entry.data.get(CONF_EMAIL),
+        token=token,
+    )
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Cellarion from a config entry."""
     await _async_register_card(hass)
@@ -152,6 +215,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         password=entry.data.get(CONF_PASSWORD),
         token=entry.data.get(CONF_TOKEN),
     )
+
+    # Legacy entries (pre-1.3.0) carry the account password — upgrade them
+    # to a scoped token when the server supports it. Runs before the update
+    # listener is registered, so rewriting entry data won't trigger a reload.
+    if entry.data.get(CONF_PASSWORD) and not entry.data.get(CONF_TOKEN):
+        if token_client := await _async_migrate_to_token(hass, entry, client):
+            client = token_client
 
     scan_interval = entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
     coordinator = CellarionCoordinator(
