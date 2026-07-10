@@ -197,10 +197,16 @@ class CellarionCard extends HTMLElement {
           </div>`).join("")}
       </div>` : "";
 
+    const serviceMsg =
+      ["unavailable", "unknown", "unreachable"].includes(service)
+        ? "Cannot reach Cellarion right now — sensors resume automatically"
+        : service === "degraded"
+          ? "Cellarion is up but degraded (database issue)"
+          : `Cellarion status: ${service}`;
     const serviceHtml = service && service !== "ok" ? `
       <div class="banner">
         <ha-icon icon="mdi:alert"></ha-icon>
-        Cellarion instance is ${esc(service)}
+        ${esc(serviceMsg)}
       </div>` : "";
 
     this.shadowRoot.innerHTML = `
