@@ -38,6 +38,12 @@
       }
     }
   },
+  "issues": {
+    "push_forbidden": {
+      "title": "Cellarion instant updates unavailable",
+      "description": "The configured API token does not have the 'read' scope, so instant (push) updates are disabled. Create a new token with the read scope in Cellarion → Settings → API tokens and reconfigure the integration. Polling continues to work in the meantime."
+    }
+  },
   "entity": {
     "sensor": {
       "total_bottles": { "name": "Total bottles" },

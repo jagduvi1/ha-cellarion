@@ -21,6 +21,10 @@ class CellarionPushNotSupported(CellarionApiError):
     """The server does not offer the push event stream."""
 
 
+class CellarionPushForbidden(CellarionApiError):
+    """The credential lacks the scope required for the push stream."""
+
+
 class CellarionApiClient:
     """Async API client for Cellarion."""
 
@@ -185,6 +189,13 @@ class CellarionApiClient:
                 resp.close()
                 raise CellarionAuthError("Push stream rejected credentials")
 
+        if resp.status == 403:
+            # API token without the 'read' scope — a configuration error the
+            # user must fix; retrying or falling back silently would hide it
+            resp.close()
+            raise CellarionPushForbidden(
+                "Credential lacks the 'read' scope for the event stream"
+            )
         if resp.status in (404, 405, 501):
             resp.close()
             raise CellarionPushNotSupported("Server has no /api/events/stream")

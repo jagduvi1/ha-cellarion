@@ -18,14 +18,20 @@ import logging
 import random
 from datetime import timedelta
 
+from homeassistant.helpers import issue_registry as ir
+
 from .api import (
     CellarionApiError,
     CellarionAuthError,
+    CellarionPushForbidden,
     CellarionPushNotSupported,
 )
+from .const import DOMAIN
 from .coordinator import CellarionCoordinator
 
 _LOGGER = logging.getLogger(__name__)
+
+PUSH_FORBIDDEN_ISSUE = "push_forbidden"
 
 RECONNECT_MIN_SECONDS = 30
 RECONNECT_MAX_SECONDS = 1800
@@ -49,6 +55,9 @@ async def async_push_listener(coordinator: CellarionCoordinator) -> None:
                         connected = True
                         backoff = RECONNECT_MIN_SECONDS
                         coordinator.update_interval = PUSH_POLL_INTERVAL
+                        ir.async_delete_issue(
+                            coordinator.hass, DOMAIN, PUSH_FORBIDDEN_ISSUE
+                        )
                         _LOGGER.debug(
                             "Push stream connected; polling relaxed to %s",
                             PUSH_POLL_INTERVAL,
@@ -56,6 +65,24 @@ async def async_push_listener(coordinator: CellarionCoordinator) -> None:
                         continue
                     _LOGGER.debug("Push event: %s", event)
                     await coordinator.async_request_refresh()
+            except CellarionPushForbidden:
+                # Scope misconfiguration — surface it, keep polling, and
+                # don't hammer an endpoint that will keep saying no.
+                _LOGGER.error(
+                    "Cellarion denied the push stream: the API token lacks "
+                    "the 'read' scope. Create a new token with the read "
+                    "scope (Cellarion → Settings → API tokens) and "
+                    "reconfigure the integration. Polling continues to work"
+                )
+                ir.async_create_issue(
+                    coordinator.hass,
+                    DOMAIN,
+                    PUSH_FORBIDDEN_ISSUE,
+                    is_fixable=False,
+                    severity=ir.IssueSeverity.WARNING,
+                    translation_key=PUSH_FORBIDDEN_ISSUE,
+                )
+                return
             except CellarionPushNotSupported:
                 if not unsupported_logged:
                     _LOGGER.info(
