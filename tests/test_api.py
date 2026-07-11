@@ -74,6 +74,41 @@ async def test_token_scope_error(hass: HomeAssistant, aioclient_mock) -> None:
         await client.get_stats_overview()
 
 
+async def test_get_account_id_reads_user_id(
+    hass: HomeAssistant, aioclient_mock
+) -> None:
+    """The account id is read from the identity endpoint."""
+    aioclient_mock.get(f"{BASE_URL}/api/auth/me", json={"user": {"id": "ACC-1"}})
+    client = CellarionApiClient(
+        async_get_clientsession(hass), BASE_URL, token=TEST_TOKEN
+    )
+    assert await client.get_account_id() == "ACC-1"
+
+
+async def test_get_account_id_none_when_scope_denied(
+    hass: HomeAssistant, aioclient_mock
+) -> None:
+    """A 403 (token can't reach /api/auth/me yet) yields None, not an error."""
+    aioclient_mock.get(
+        f"{BASE_URL}/api/auth/me", status=403, json={"error": "scope"}
+    )
+    client = CellarionApiClient(
+        async_get_clientsession(hass), BASE_URL, token=TEST_TOKEN
+    )
+    assert await client.get_account_id() is None
+
+
+async def test_get_account_id_none_on_non_dict_body(
+    hass: HomeAssistant, aioclient_mock
+) -> None:
+    """A valid-JSON but non-object 200 body must not raise — returns None."""
+    aioclient_mock.get(f"{BASE_URL}/api/auth/me", json=[])
+    client = CellarionApiClient(
+        async_get_clientsession(hass), BASE_URL, token=TEST_TOKEN
+    )
+    assert await client.get_account_id() is None
+
+
 async def test_create_token_not_supported(
     hass: HomeAssistant, aioclient_mock
 ) -> None:

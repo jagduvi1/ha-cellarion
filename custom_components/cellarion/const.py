@@ -6,6 +6,7 @@ CONF_URL = "url"
 CONF_EMAIL = "email"
 CONF_PASSWORD = "password"
 CONF_TOKEN = "token"
+CONF_ACCOUNT_ID = "account_id"
 CONF_SCAN_INTERVAL = "scan_interval"
 
 TOKEN_SCOPES = ["read", "consume"]
