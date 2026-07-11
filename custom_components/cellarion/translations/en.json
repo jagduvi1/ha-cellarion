@@ -49,6 +49,7 @@
       "invalid_token": "This API token was not accepted (revoked or mistyped).",
       "token_scope": "This API token is missing the read scope. Create one with both the read and consume scopes.",
       "invalid_url": "That does not look like a valid instance URL. Check the address and try again.",
+      "account_mismatch": "These credentials are for a different Cellarion account than this entry. Re-authenticate with the original account, or remove this entry and add the other account separately.",
       "unknown": "An unexpected error occurred."
     },
     "abort": {

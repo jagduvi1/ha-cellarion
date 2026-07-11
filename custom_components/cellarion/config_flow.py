@@ -36,6 +36,7 @@ from .api import (
     CellarionTokensNotSupported,
 )
 from .const import (
+    CONF_ACCOUNT_ID,
     CONF_EMAIL,
     CONF_PASSWORD,
     CONF_SCAN_INTERVAL,
@@ -65,24 +66,47 @@ def _normalize_url(raw: str) -> str | None:
     return url
 
 
-async def _validate_token(hass: HomeAssistant, url: str, token: str) -> str | None:
-    """Try a read call with the token. Return an error key or None."""
+async def _validate_token(
+    hass: HomeAssistant, url: str, token: str
+) -> tuple[str | None, str | None]:
+    """Try a read call with the token.
+
+    Returns (error_key, account_id): error_key is None on success, and
+    account_id is the identity to verify against on reauth (None when the
+    server/token can't provide one).
+    """
     client = CellarionApiClient(
         async_get_clientsession(hass), url, token=token
     )
     try:
         await client.get_stats_overview()
     except CellarionScopeError:
-        return "token_scope"
+        return "token_scope", None
     except CellarionAuthError:
-        return "invalid_token"
+        return "invalid_token", None
     except CellarionApiError as err:
         _LOGGER.error("Cannot connect to Cellarion at %s: %s", url, err)
-        return "cannot_connect"
+        return "cannot_connect", None
     except Exception:  # noqa: BLE001
         _LOGGER.exception("Unexpected error validating Cellarion token")
-        return "unknown"
-    return None
+        return "unknown", None
+    return None, await client.get_account_id()
+
+
+def _account_mismatch(
+    entry: ConfigEntry | None, new_account_id: str | None
+) -> bool:
+    """True only when the new credential provably belongs to a different account.
+
+    Requires both a previously stored account id and a freshly fetched one —
+    if either is unknown (older server, token without identity scope, or an
+    entry created before this check existed) the reauth proceeds unguarded,
+    exactly as before.
+    """
+    if not entry or not new_account_id:
+        return False
+    stored = entry.data.get(CONF_ACCOUNT_ID)
+    return bool(stored) and stored != new_account_id
 
 
 class CellarionConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -161,15 +185,19 @@ class CellarionConfigFlow(ConfigFlow, domain=DOMAIN):
             if url is None:
                 errors["base"] = "invalid_url"
             else:
-                error = await _validate_token(self.hass, url, token)
+                error, account_id = await _validate_token(self.hass, url, token)
                 if error:
                     errors["base"] = error
+                elif _account_mismatch(entry, account_id):
+                    errors["base"] = "account_mismatch"
                 elif entry:
                     return await self._async_finish_existing(
                         {
                             CONF_URL: url,
                             CONF_EMAIL: entry.data.get(CONF_EMAIL),
                             CONF_TOKEN: token,
+                            CONF_ACCOUNT_ID: account_id
+                            or entry.data.get(CONF_ACCOUNT_ID),
                         }
                     )
                 else:
@@ -177,9 +205,12 @@ class CellarionConfigFlow(ConfigFlow, domain=DOMAIN):
                     await self.async_set_unique_id(f"{url}_token_{token_id}")
                     self._abort_if_unique_id_configured()
                     host = urlparse(url).netloc or url
+                    data = {CONF_URL: url, CONF_TOKEN: token}
+                    if account_id:
+                        data[CONF_ACCOUNT_ID] = account_id
                     return self.async_create_entry(
                         title=f"Cellarion ({host})",
-                        data={CONF_URL: url, CONF_TOKEN: token},
+                        data=data,
                         options={CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL},
                     )
 
@@ -224,11 +255,15 @@ class CellarionConfigFlow(ConfigFlow, domain=DOMAIN):
                     self._abort_if_unique_id_configured()
 
                 data: dict[str, Any] | None = None
+                account_id: str | None = None
                 client = CellarionApiClient(
                     async_get_clientsession(self.hass), url, email, password
                 )
                 try:
                     await client.authenticate()
+                    # The JWT from authenticate() can read the identity endpoint
+                    # even when a scoped token later cannot.
+                    account_id = await client.get_account_id()
                     try:
                         name = f"Home Assistant ({self.hass.config.location_name})"
                         token = await client.async_create_api_token(
@@ -245,6 +280,12 @@ class CellarionConfigFlow(ConfigFlow, domain=DOMAIN):
                             CONF_EMAIL: email,
                             CONF_PASSWORD: password,
                         }
+                    # Keep any previously stored id if the server can't supply one
+                    resolved = account_id or (
+                        entry.data.get(CONF_ACCOUNT_ID) if entry else None
+                    )
+                    if resolved:
+                        data[CONF_ACCOUNT_ID] = resolved
                 except CellarionAuthError:
                     errors["base"] = "invalid_auth"
                 except CellarionApiError as err:
@@ -257,13 +298,16 @@ class CellarionConfigFlow(ConfigFlow, domain=DOMAIN):
                     errors["base"] = "unknown"
 
                 if data is not None:
-                    if entry:
+                    if _account_mismatch(entry, account_id):
+                        errors["base"] = "account_mismatch"
+                    elif entry:
                         return await self._async_finish_existing(data)
-                    return self.async_create_entry(
-                        title=f"Cellarion ({email})",
-                        data=data,
-                        options={CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL},
-                    )
+                    else:
+                        return self.async_create_entry(
+                            title=f"Cellarion ({email})",
+                            data=data,
+                            options={CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL},
+                        )
 
         if entry and self._is_reauth:
             schema = vol.Schema(

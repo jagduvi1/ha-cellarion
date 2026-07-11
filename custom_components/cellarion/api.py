@@ -163,6 +163,28 @@ class CellarionApiClient:
         """Fetch user's cellars."""
         return await self._request("GET", "/api/cellars")
 
+    async def get_account_id(self) -> str | None:
+        """Best-effort stable account id, used to verify reauth stays on the
+        same account.
+
+        Returns None when the server or credential can't provide one — an
+        older server without the identity endpoint, or an API token whose
+        scope does not include it (the personal-token allowlist may not cover
+        this route). Callers treat None as "unknown" and skip the check, never
+        as an error.
+        """
+        try:
+            data = await self._request("GET", "/api/auth/me")
+        except CellarionApiError:
+            return None
+        if not isinstance(data, dict):
+            # A proxy/edge server could answer 200 with a JSON array or scalar
+            return None
+        user = data.get("user")
+        user = user if isinstance(user, dict) else {}
+        account_id = data.get("id") or user.get("id") or user.get("_id")
+        return str(account_id) if account_id else None
+
     async def get_notifications(self) -> dict:
         """Fetch notifications with unread count."""
         return await self._request("GET", "/api/notifications")

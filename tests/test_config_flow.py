@@ -11,6 +11,8 @@ from homeassistant.config_entries import SOURCE_REAUTH, SOURCE_RECONFIGURE, SOUR
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 
+from pytest_homeassistant_custom_component.common import MockConfigEntry
+
 from custom_components.cellarion.const import DOMAIN
 
 from .conftest import (
@@ -19,6 +21,17 @@ from .conftest import (
     TEST_TOKEN,
     mock_cellarion_api,
 )
+
+
+def _token_entry_with_account(account_id: str) -> MockConfigEntry:
+    """A token entry that has already recorded its account id."""
+    return MockConfigEntry(
+        domain=DOMAIN,
+        title="Cellarion (cellarion.local)",
+        unique_id=f"{BASE_URL}_token_abcdef123456",
+        data={"url": BASE_URL, "token": TEST_TOKEN, "account_id": account_id},
+        options={"scan_interval": 1800},
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -182,6 +195,75 @@ async def test_reauth_token(hass: HomeAssistant, aioclient_mock, token_entry) ->
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "reauth_successful"
     assert token_entry.data["token"] == NEW_TOKEN
+
+
+async def test_token_flow_stores_account_id(
+    hass: HomeAssistant, aioclient_mock
+) -> None:
+    """When the server exposes an account id, it's recorded on the entry."""
+    mock_cellarion_api(
+        aioclient_mock, me_status=200, me_json={"user": {"id": "ACCOUNT-X"}}
+    )
+    result = await _menu_to(hass, "token")
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"url": BASE_URL, "token": TEST_TOKEN}
+    )
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"] == {
+        "url": BASE_URL,
+        "token": TEST_TOKEN,
+        "account_id": "ACCOUNT-X",
+    }
+
+
+async def test_reauth_token_wrong_account_aborts(
+    hass: HomeAssistant, aioclient_mock
+) -> None:
+    """Reauth with a token for a different account is rejected, not accepted."""
+    entry = _token_entry_with_account("ACCOUNT-A")
+    entry.add_to_hass(hass)
+    mock_cellarion_api(
+        aioclient_mock, me_status=200, me_json={"user": {"id": "ACCOUNT-B"}}
+    )
+
+    result = await _menu_to(
+        hass,
+        "token",
+        context={"source": SOURCE_REAUTH, "entry_id": entry.entry_id},
+        data=entry.data,
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"token": NEW_TOKEN}
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": "account_mismatch"}
+    # The entry is untouched — no silent account switch
+    assert entry.data["token"] == TEST_TOKEN
+
+
+async def test_reauth_token_same_account_succeeds(
+    hass: HomeAssistant, aioclient_mock
+) -> None:
+    """Reauth with a new token for the SAME account swaps it as normal."""
+    entry = _token_entry_with_account("ACCOUNT-A")
+    entry.add_to_hass(hass)
+    mock_cellarion_api(
+        aioclient_mock, me_status=200, me_json={"user": {"id": "ACCOUNT-A"}}
+    )
+
+    result = await _menu_to(
+        hass,
+        "token",
+        context={"source": SOURCE_REAUTH, "entry_id": entry.entry_id},
+        data=entry.data,
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"token": NEW_TOKEN}
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "reauth_successful"
+    assert entry.data["token"] == NEW_TOKEN
+    assert entry.data["account_id"] == "ACCOUNT-A"
 
 
 async def test_reconfigure_token_changes_url(

@@ -7,12 +7,18 @@ from typing import TYPE_CHECKING, Any
 from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.core import HomeAssistant
 
-from .const import CONF_EMAIL, CONF_PASSWORD, CONF_TOKEN, CONF_URL
+from .const import (
+    CONF_ACCOUNT_ID,
+    CONF_EMAIL,
+    CONF_PASSWORD,
+    CONF_TOKEN,
+    CONF_URL,
+)
 
 if TYPE_CHECKING:
     from . import CellarionConfigEntry
 
-TO_REDACT = {CONF_TOKEN, CONF_PASSWORD, CONF_EMAIL, CONF_URL}
+TO_REDACT = {CONF_TOKEN, CONF_PASSWORD, CONF_EMAIL, CONF_URL, CONF_ACCOUNT_ID}
 # Keys inside coordinator.data that identify the instance or hold personal
 # content (notification text) — redacted from the diagnostics dump.
 DATA_TO_REDACT = {"instance_url", "notifications"}
