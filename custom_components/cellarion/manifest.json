@@ -9,5 +9,6 @@
   "integration_type": "hub",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/jagduvi1/ha-cellarion/issues",
-  "version": "1.5.0"
+  "loggers": ["custom_components.cellarion"],
+  "version": "1.6.0"
 }

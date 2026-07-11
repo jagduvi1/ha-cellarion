@@ -9,6 +9,10 @@
  *   type: custom:cellarion-card
  *   title: Wine Cellar            (optional)
  *   prefix: sensor.cellarion     (optional — entity id prefix)
+ *   url: https://cellarion.app   (optional — overrides the title/link target)
+ *   entry_id: <config entry>     (optional — required only when more than one
+ *                                 Cellarion account is configured, so the
+ *                                 consume button targets the right one)
  */
 
 const MATURITY = [
@@ -146,8 +150,11 @@ class CellarionCard extends HTMLElement {
       ?.urgent_bottles || []).slice(0, 5);
     const ready = (this._state("_bottles_at_peak")?.attributes
       ?.peak_bottles || []).slice(0, 5);
-    const link = this._config.url
+    const rawLink = this._config.url
       || this._state("_service_status")?.attributes?.instance_url;
+    // Only ever open an http(s) target — never a javascript:/data: URL that
+    // could arrive via card config or a spoofed instance_url attribute.
+    const link = /^https?:\/\//i.test(rawLink || "") ? rawLink : null;
     const urgentTotal = (this._num("_bottles_declining") ?? 0)
       + (this._num("_bottles_late_window") ?? 0);
     const moreLine = (total, shown) => total > shown ? (link
@@ -301,15 +308,27 @@ class CellarionCard extends HTMLElement {
       </ha-card>`;
 
     this.shadowRoot.querySelectorAll("[data-entity]").forEach((el) => {
-      el.addEventListener("click", () => this._moreInfo(el.dataset.entity));
+      // Make the click-to-open targets reachable by keyboard/screen readers.
+      el.setAttribute("role", "button");
+      el.setAttribute("tabindex", "0");
+      const open = () => this._moreInfo(el.dataset.entity);
+      el.addEventListener("click", open);
+      el.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter" || ev.key === " ") {
+          ev.preventDefault();
+          open();
+        }
+      });
     });
     this.shadowRoot.querySelectorAll("button.consume").forEach((el) => {
       el.addEventListener("click", (ev) => {
         ev.stopPropagation();
         if (window.confirm(`Mark "${el.dataset.name}" as drunk?`)) {
-          this._hass.callService("cellarion", "consume_bottle", {
-            bottle_id: el.dataset.bottle,
-          });
+          const data = { bottle_id: el.dataset.bottle };
+          // Needed when more than one Cellarion account is configured;
+          // harmless (ignored) for a single account.
+          if (this._config.entry_id) data.entry_id = this._config.entry_id;
+          this._hass.callService("cellarion", "consume_bottle", data);
         }
       });
     });
@@ -338,9 +357,15 @@ class CellarionCardEditor extends HTMLElement {
     this._form.schema = [
       { name: "title", selector: { text: {} } },
       { name: "prefix", selector: { text: {} } },
+      { name: "url", selector: { text: {} } },
+      { name: "entry_id", selector: { config_entry: { integration: "cellarion" } } },
     ];
-    this._form.computeLabel = (s) =>
-      s.name === "title" ? "Title" : "Entity prefix";
+    this._form.computeLabel = (s) => ({
+      title: "Title",
+      prefix: "Entity prefix",
+      url: "Link URL (optional)",
+      entry_id: "Account (only if you have several)",
+    }[s.name] || s.name);
     this._form.addEventListener("value-changed", (ev) => {
       this._config = ev.detail.value;
       this.dispatchEvent(new CustomEvent("config-changed", {
