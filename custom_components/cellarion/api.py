@@ -167,14 +167,15 @@ class CellarionApiClient:
         """Best-effort stable account id, used to verify reauth stays on the
         same account.
 
-        Returns None when the server or credential can't provide one — an
-        older server without the identity endpoint, or an API token whose
-        scope does not include it (the personal-token allowlist may not cover
-        this route). Callers treat None as "unknown" and skip the check, never
-        as an error.
+        Reads the scoped identity endpoint /api/auth/whoami, which returns
+        just {"id": ...}. Returns None when the server or credential can't
+        provide one — an older server without the endpoint (404), or a token
+        whose scope doesn't include it (403). Callers treat None as "unknown"
+        and skip the check, never as an error. The nested "user" fallback keeps
+        it working against the fuller /api/auth/me shape too.
         """
         try:
-            data = await self._request("GET", "/api/auth/me")
+            data = await self._request("GET", "/api/auth/whoami")
         except CellarionApiError:
             return None
         if not isinstance(data, dict):
