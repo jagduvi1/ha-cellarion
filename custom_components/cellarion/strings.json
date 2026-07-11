@@ -48,7 +48,7 @@
       "invalid_auth": "Invalid email or password.",
       "invalid_token": "This API token was not accepted (revoked or mistyped).",
       "token_scope": "This API token is missing the read scope. Create one with both the read and consume scopes.",
-      "invalid_url": "Enter a valid http(s) URL, for example https://cellarion.app.",
+      "invalid_url": "That does not look like a valid instance URL. Check the address and try again.",
       "unknown": "An unexpected error occurred."
     },
     "abort": {
