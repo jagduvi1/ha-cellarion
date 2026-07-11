@@ -91,13 +91,14 @@ def mock_cellarion_api(
     stats_status: int = 200,
     peak_status: int = 200,
     peak_json: dict | None = None,
-    me_status: int = 404,
-    me_json: dict | None = None,
+    whoami_status: int = 404,
+    whoami_json: dict | None = None,
 ) -> None:
     """Register happy-path (or overridden) mocks for the Cellarion API.
 
-    /api/auth/me defaults to 404 — matching today's servers, where a scoped
-    API token cannot reach the identity endpoint, so no account id is stored.
+    /api/auth/whoami defaults to 404 — modelling a server that predates the
+    scoped identity endpoint, so no account id is stored and the same-account
+    check stays dormant. Pass whoami_status=200 to exercise the active path.
     """
     if login_status == 200:
         aioclient_mock.post(
@@ -145,14 +146,14 @@ def mock_cellarion_api(
         aioclient_mock.get(
             f"{url}/api/bottles", status=peak_status, json={"error": "no"}
         )
-    if me_status == 200:
+    if whoami_status == 200:
         aioclient_mock.get(
-            f"{url}/api/auth/me",
-            json=me_json if me_json is not None else {"user": {"id": "ACCOUNT-A"}},
+            f"{url}/api/auth/whoami",
+            json=whoami_json if whoami_json is not None else {"id": "ACCOUNT-A"},
         )
     else:
         aioclient_mock.get(
-            f"{url}/api/auth/me", status=me_status, json={"error": "no"}
+            f"{url}/api/auth/whoami", status=whoami_status, json={"error": "no"}
         )
     # No push support in tests — the listener falls back to polling
     aioclient_mock.get(f"{url}/api/events/stream", status=404)

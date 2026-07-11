@@ -202,7 +202,7 @@ async def test_token_flow_stores_account_id(
 ) -> None:
     """When the server exposes an account id, it's recorded on the entry."""
     mock_cellarion_api(
-        aioclient_mock, me_status=200, me_json={"user": {"id": "ACCOUNT-X"}}
+        aioclient_mock, whoami_status=200, whoami_json={"id": "ACCOUNT-X"}
     )
     result = await _menu_to(hass, "token")
     result = await hass.config_entries.flow.async_configure(
@@ -223,7 +223,7 @@ async def test_reauth_token_wrong_account_aborts(
     entry = _token_entry_with_account("ACCOUNT-A")
     entry.add_to_hass(hass)
     mock_cellarion_api(
-        aioclient_mock, me_status=200, me_json={"user": {"id": "ACCOUNT-B"}}
+        aioclient_mock, whoami_status=200, whoami_json={"id": "ACCOUNT-B"}
     )
 
     result = await _menu_to(
@@ -248,7 +248,7 @@ async def test_reauth_token_same_account_succeeds(
     entry = _token_entry_with_account("ACCOUNT-A")
     entry.add_to_hass(hass)
     mock_cellarion_api(
-        aioclient_mock, me_status=200, me_json={"user": {"id": "ACCOUNT-A"}}
+        aioclient_mock, whoami_status=200, whoami_json={"id": "ACCOUNT-A"}
     )
 
     result = await _menu_to(
