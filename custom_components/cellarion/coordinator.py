@@ -24,6 +24,29 @@ from .const import DOMAIN
 _LOGGER = logging.getLogger(__name__)
 
 
+def _parse_peak_bottles(peak_data: dict[str, Any]) -> list[dict[str, Any]]:
+    """Shape the peak-bottle payload into the sensor's attribute list.
+
+    Kept small and pure so the caller can treat any error (missing keys,
+    unexpected types) as "no peak data" without failing the whole update.
+    """
+    peak_items = peak_data.get("bottles", {}).get("items", [])
+    return sorted(
+        (
+            {
+                "id": b.get("_id"),
+                "name": (b.get("wineDefinition") or {}).get("name", "Unknown"),
+                "producer": (b.get("wineDefinition") or {}).get("producer", ""),
+                "vintage": b.get("vintage") or "NV",
+                "drink_to": b.get("drinkTo"),
+            }
+            for b in peak_items
+        ),
+        # Drink first what leaves its window first; None (unknown) sorts last
+        key=lambda x: (x["drink_to"] is None, x["drink_to"]),
+    )
+
+
 class CellarionCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     """Coordinator that polls the Cellarion API."""
 
@@ -50,13 +73,19 @@ class CellarionCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             cellars_data = await self.client.get_cellars()
             notifications_data = await self.client.get_notifications()
             health_data = await self.client.get_health()
-            # Best-effort: powers the "ready to drink" list; a failure here
-            # (e.g. older self-hosted server) must not break the sensors
+            # Best-effort: powers the "ready to drink" list. A failure here —
+            # an older self-hosted server (API error) or an unexpected payload
+            # shape (parse error) — must not break the other sensors, so both
+            # the fetch and the parse are guarded.
             try:
                 peak_data = await self.client.get_peak_bottles()
+                peak_bottles = _parse_peak_bottles(peak_data)
             except CellarionApiError as err:
                 _LOGGER.debug("Peak bottles unavailable: %s", err)
-                peak_data = {}
+                peak_bottles = []
+            except (AttributeError, KeyError, TypeError, ValueError) as err:
+                _LOGGER.debug("Peak bottles payload unexpected: %s", err)
+                peak_bottles = []
         except CellarionScopeError as err:
             # Token valid but missing the read scope — user must provide a
             # properly scoped token; the reauth flow lets them do that.
@@ -84,22 +113,6 @@ class CellarionCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         overview = stats.get("overview", {})
         maturity = stats.get("maturity", {})
         pace = stats.get("pace", {})
-
-        peak_items = peak_data.get("bottles", {}).get("items", [])
-        peak_bottles = sorted(
-            (
-                {
-                    "id": b.get("_id"),
-                    "name": (b.get("wineDefinition") or {}).get("name", "Unknown"),
-                    "producer": (b.get("wineDefinition") or {}).get("producer", ""),
-                    "vintage": b.get("vintage") or "NV",
-                    "drink_to": b.get("drinkTo"),
-                }
-                for b in peak_items
-            ),
-            # Drink first what leaves its window first
-            key=lambda x: (x["drink_to"] is None, x["drink_to"]),
-        )
 
         return {
             "overview": overview,

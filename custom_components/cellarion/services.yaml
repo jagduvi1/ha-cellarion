@@ -1,19 +1,13 @@
+# Field labels and descriptions are translated in strings.json
+# (services.consume_bottle); this file defines structure and selectors only.
 consume_bottle:
-  name: Consume bottle
-  description: >-
-    Mark a bottle in your Cellarion cellar as consumed (drank, gifted,
-    sold, or other). Frees its rack slot and updates your statistics.
   fields:
     bottle_id:
-      name: Bottle ID
-      description: The Cellarion bottle id to consume.
       required: true
       example: "6a50805b785f507654afdc51"
       selector:
         text:
     reason:
-      name: Reason
-      description: Why the bottle left the cellar.
       default: drank
       selector:
         select:
@@ -23,8 +17,6 @@ consume_bottle:
             - sold
             - other
     rating:
-      name: Rating
-      description: Optional rating to record with the consumption.
       selector:
         number:
           min: 0
@@ -32,15 +24,10 @@ consume_bottle:
           step: 0.5
           mode: box
     note:
-      name: Note
-      description: Optional tasting note or comment (max 1000 characters).
       selector:
         text:
           multiline: true
     entry_id:
-      name: Config entry
-      description: >-
-        Only needed when multiple Cellarion accounts are configured.
       selector:
         config_entry:
           integration: cellarion

@@ -88,6 +88,21 @@ class CellarionApiClient:
             raise CellarionApiError("No token in login response")
         return True
 
+    async def _send(
+        self, method: str, path: str, json: dict | None
+    ) -> aiohttp.ClientResponse:
+        """Issue one request, mapping transport errors to CellarionApiError."""
+        try:
+            return await self._session.request(
+                method,
+                f"{self._url}{path}",
+                headers={"Authorization": f"Bearer {self._token}"},
+                json=json,
+                timeout=aiohttp.ClientTimeout(total=30),
+            )
+        except (aiohttp.ClientError, TimeoutError) as err:
+            raise CellarionApiError(f"Request failed: {err}") from err
+
     async def _request(
         self, method: str, path: str, json: dict | None = None
     ) -> dict:
@@ -95,54 +110,50 @@ class CellarionApiClient:
         if not self._token:
             await self.authenticate()
 
-        headers = {"Authorization": f"Bearer {self._token}"}
+        resp = await self._send(method, path, json)
+        # Always release the connection back to the pool, even on error paths.
         try:
-            resp = await self._session.request(
-                method,
-                f"{self._url}{path}",
-                headers=headers,
-                json=json,
-                timeout=aiohttp.ClientTimeout(total=30),
-            )
-        except (aiohttp.ClientError, TimeoutError) as err:
-            raise CellarionApiError(f"Request failed: {err}") from err
-
-        if resp.status == 401:
-            # Token expired — re-authenticate and retry once
-            _LOGGER.debug("Token expired, re-authenticating")
-            await self.authenticate()
-            headers = {"Authorization": f"Bearer {self._token}"}
-            try:
-                resp = await self._session.request(
-                    method,
-                    f"{self._url}{path}",
-                    headers=headers,
-                    json=json,
-                    timeout=aiohttp.ClientTimeout(total=30),
-                )
-            except (aiohttp.ClientError, TimeoutError) as err:
-                raise CellarionApiError(f"Retry failed: {err}") from err
             if resp.status == 401:
-                raise CellarionAuthError("Authentication rejected after retry")
+                # Token expired — re-authenticate and retry once
+                _LOGGER.debug("Token expired, re-authenticating")
+                resp.close()
+                await self.authenticate()
+                resp = await self._send(method, path, json)
+                if resp.status == 401:
+                    raise CellarionAuthError(
+                        "Authentication rejected after retry"
+                    )
 
-        if resp.status == 403 and self._api_token:
-            # Valid token, missing scope — a config error; re-login won't help
-            raise CellarionScopeError(
-                f"API token lacks the scope for {method} {path}"
-            )
+            if resp.status == 403 and self._api_token:
+                # Valid token, missing scope — a config error; re-login won't help
+                raise CellarionScopeError(
+                    f"API token lacks the scope for {method} {path}"
+                )
 
-        if resp.status != 200:
-            detail = ""
+            # Accept the 2xx success range: action endpoints (e.g. consume) may
+            # answer 201/204 rather than 200.
+            if not 200 <= resp.status < 300:
+                detail = ""
+                try:
+                    detail = (await resp.json()).get("error", "")
+                except Exception:  # noqa: BLE001 — best-effort error body
+                    pass
+                raise CellarionApiError(
+                    f"{method} {path} returned status {resp.status}"
+                    + (f": {detail}" if detail else "")
+                )
+
+            # getattr keeps this working against test doubles that don't
+            # implement content_length; real aiohttp always provides it.
+            if resp.status == 204 or getattr(resp, "content_length", None) == 0:
+                return {}
             try:
-                detail = (await resp.json()).get("error", "")
-            except Exception:  # noqa: BLE001 — best-effort error body
-                pass
-            raise CellarionApiError(
-                f"{method} {path} returned status {resp.status}"
-                + (f": {detail}" if detail else "")
-            )
-
-        return await resp.json()
+                return await resp.json()
+            except (aiohttp.ClientError, ValueError):
+                # No/!JSON body on a success status — nothing to return
+                return {}
+        finally:
+            resp.close()
 
     async def get_stats_overview(self) -> dict:
         """Fetch collection statistics."""

@@ -11,6 +11,7 @@ import pytest
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import issue_registry as ir
 
+from custom_components.cellarion import push
 from custom_components.cellarion.api import (
     CellarionPushForbidden,
     CellarionPushNotSupported,
@@ -19,6 +20,7 @@ from custom_components.cellarion.const import DOMAIN
 from custom_components.cellarion.push import (
     PUSH_FORBIDDEN_ISSUE,
     PUSH_POLL_INTERVAL,
+    RECONNECT_MIN_SECONDS,
     async_push_listener,
 )
 
@@ -97,3 +99,77 @@ async def test_forbidden_creates_repair_issue(hass: HomeAssistant) -> None:
 
     registry = ir.async_get(hass)
     assert registry.async_get_issue(DOMAIN, PUSH_FORBIDDEN_ISSUE) is not None
+
+
+class _StopLoop(Exception):
+    """Sentinel to break async_push_listener's infinite loop in tests."""
+
+
+class _FakeClock:
+    """Stand-in for push's `time` — monotonic() advances by `step` per call.
+
+    Assigned to ``push.time`` (the module attribute) so the real `time`
+    module is never mutated; each outer loop iteration calls monotonic()
+    exactly twice (at "_connected" and at the uptime check), so the uptime
+    the listener sees per connection is always ``step`` seconds.
+    """
+
+    def __init__(self, step: float) -> None:
+        self._t = 0.0
+        self._step = step
+
+    def monotonic(self) -> float:
+        t = self._t
+        self._t += self._step
+        return t
+
+
+class _FakeAsyncio:
+    """Stand-in for push's `asyncio` — sleep() records the delay, never waits."""
+
+    def __init__(self, delays: list[float], stop_after: int) -> None:
+        self._delays = delays
+        self._stop_after = stop_after
+
+    async def sleep(self, delay: float) -> None:
+        self._delays.append(delay)
+        if len(self._delays) >= self._stop_after:
+            raise _StopLoop
+
+
+async def test_backoff_grows_when_stream_flaps(
+    hass: HomeAssistant, monkeypatch
+) -> None:
+    """A stream that connects then drops instantly must back off, not busy-loop."""
+    delays: list[float] = []
+    monkeypatch.setattr(push, "asyncio", _FakeAsyncio(delays, stop_after=3))
+    # Uptime per connection = 1s (< STABLE 30s) -> never counts as stable
+    monkeypatch.setattr(push, "time", _FakeClock(step=1.0))
+
+    # events=() -> yields "_connected" then the stream ends immediately
+    coordinator = FakeCoordinator(hass, FakeClient(events=()))
+    with pytest.raises(_StopLoop):
+        await async_push_listener(coordinator)
+
+    assert len(delays) == 3
+    # Each reconnect waits strictly longer than the last (exponential backoff)
+    assert delays[0] < delays[1] < delays[2]
+    assert delays[0] >= RECONNECT_MIN_SECONDS
+
+
+async def test_backoff_resets_after_stable_connection(
+    hass: HomeAssistant, monkeypatch
+) -> None:
+    """A connection that stays up long enough resets the backoff to its minimum."""
+    delays: list[float] = []
+    monkeypatch.setattr(push, "asyncio", _FakeAsyncio(delays, stop_after=2))
+    # Uptime per connection = 1000s (>= STABLE 30s) -> always counts as stable
+    monkeypatch.setattr(push, "time", _FakeClock(step=1000.0))
+
+    coordinator = FakeCoordinator(hass, FakeClient(events=()))
+    with pytest.raises(_StopLoop):
+        await async_push_listener(coordinator)
+
+    assert len(delays) == 2
+    # Backoff never grew — both waits stayed at ~the minimum
+    assert all(d < RECONNECT_MIN_SECONDS * 2 for d in delays)

@@ -43,6 +43,26 @@ async def test_consume_bottle(hass: HomeAssistant, aioclient_mock, token_entry) 
     }
 
 
+async def test_consume_bottle_accepts_201(
+    hass: HomeAssistant, aioclient_mock, token_entry
+) -> None:
+    """A 201 Created (resource-creating POST) is treated as success."""
+    token_entry.add_to_hass(hass)
+    mock_cellarion_api(aioclient_mock)
+    aioclient_mock.post(
+        f"{BASE_URL}/api/bottles/BOTTLE1/consume",
+        status=201,
+        json={"bottle": {}},
+    )
+    assert await hass.config_entries.async_setup(token_entry.entry_id)
+    await hass.async_block_till_done()
+
+    # Must not raise despite the non-200 success status
+    await hass.services.async_call(
+        DOMAIN, "consume_bottle", {"bottle_id": "BOTTLE1"}, blocking=True
+    )
+
+
 async def test_consume_without_entries(hass: HomeAssistant) -> None:
     """Calling the service with no accounts raises a validation error."""
     assert await async_setup_component(hass, DOMAIN, {})

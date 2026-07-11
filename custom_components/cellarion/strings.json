@@ -48,6 +48,7 @@
       "invalid_auth": "Invalid email or password.",
       "invalid_token": "This API token was not accepted (revoked or mistyped).",
       "token_scope": "This API token is missing the read scope. Create one with both the read and consume scopes.",
+      "invalid_url": "Enter a valid http(s) URL, for example https://cellarion.app.",
       "unknown": "An unexpected error occurred."
     },
     "abort": {
@@ -77,6 +78,34 @@
     },
     "consume_failed": {
       "message": "Could not consume the bottle: {error}"
+    }
+  },
+  "services": {
+    "consume_bottle": {
+      "name": "Consume bottle",
+      "description": "Mark a bottle in your Cellarion cellar as consumed (drank, gifted, sold, or other). Frees its rack slot and updates your statistics.",
+      "fields": {
+        "bottle_id": {
+          "name": "Bottle ID",
+          "description": "The Cellarion bottle id to consume."
+        },
+        "reason": {
+          "name": "Reason",
+          "description": "Why the bottle left the cellar."
+        },
+        "rating": {
+          "name": "Rating",
+          "description": "Optional rating to record with the consumption."
+        },
+        "note": {
+          "name": "Note",
+          "description": "Optional tasting note or comment (max 1000 characters)."
+        },
+        "entry_id": {
+          "name": "Config entry",
+          "description": "Only needed when multiple Cellarion accounts are configured."
+        }
+      }
     }
   },
   "options": {

@@ -99,8 +99,8 @@ entry's menu) and **diagnostics download** (token and account redacted).
 | Cellars | Number of cellars | per-cellar breakdown |
 | Average rating | Mean rating across bottles | — |
 | Countries | Countries represented (disabled by default) | top 5 countries |
-| Bottles at peak | Ready to drink now | ready-to-drink list (top 10, with ids) |
-| Bottles declining | Past peak, drink soon! | urgent bottles list |
+| Bottles at peak | Ready to drink now | ready-to-drink list (name, vintage, drink-to window, with ids) |
+| Bottles declining | Past peak, drink soon! | urgent bottles list (top 10, with ids) |
 | Bottles not ready | Too young to open | — |
 | Bottles early window | Approaching peak | — |
 | Bottles late window | Past optimal window | — |
@@ -164,6 +164,10 @@ automatically — no extra install. Add it from the dashboard card picker
 type: custom:cellarion-card
 title: Wine Cellar          # optional
 prefix: sensor.cellarion    # optional — entity id prefix
+url: https://cellarion.app  # optional — overrides the title link target
+entry_id: <config entry>    # optional — only if you run more than one
+                            #   Cellarion account, so the consume button
+                            #   targets the right one (pick it in the editor)
 ```
 
 It shows your collection stats, a drink-window distribution bar, a
@@ -209,7 +213,7 @@ automation:
 
 ## Requirements
 
-- Home Assistant 2024.4 or newer (the bundled brand icon shows on 2026.3+)
+- Home Assistant 2024.6 or newer (the bundled brand icon shows on 2026.3+)
 - A [cellarion.app](https://cellarion.app) account (or your own self-hosted Cellarion instance)
 - Cellarion server v1.75+ unlocks instant updates, API tokens, and the
   card's consume button; older servers work with polling and password login

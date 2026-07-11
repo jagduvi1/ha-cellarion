@@ -94,7 +94,7 @@ SENSOR_DESCRIPTIONS: tuple[CellarionSensorDescription, ...] = (
         value_fn=lambda d: _get_overview(d, "totalCountries", 0),
         extra_attrs_fn=lambda d: {
             "top_countries": [
-                {"name": c["name"], "count": c["count"]}
+                {"name": c.get("name"), "count": c.get("count", 0)}
                 for c in d.get("by_country", [])[:5]
             ]
         },
@@ -161,7 +161,9 @@ SENSOR_DESCRIPTIONS: tuple[CellarionSensorDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: (
-            round(d.get("pace", {}).get("avgIntakePerYear", 0), 1)
+            round(v, 1)
+            if (v := d.get("pace", {}).get("avgIntakePerYear")) is not None
+            else None
         ),
     ),
     CellarionSensorDescription(
@@ -221,7 +223,7 @@ SENSOR_DESCRIPTIONS: tuple[CellarionSensorDescription, ...] = (
         value_fn=lambda d: len(d.get("top_producers", [])),
         extra_attrs_fn=lambda d: {
             "producers": [
-                {"name": p["name"], "count": p["count"]}
+                {"name": p.get("name"), "count": p.get("count", 0)}
                 for p in d.get("top_producers", [])[:10]
             ]
         },

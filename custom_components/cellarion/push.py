@@ -16,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import random
+import time
 from datetime import timedelta
 
 from homeassistant.helpers import issue_registry as ir
@@ -36,6 +37,12 @@ PUSH_FORBIDDEN_ISSUE = "push_forbidden"
 RECONNECT_MIN_SECONDS = 30
 RECONNECT_MAX_SECONDS = 1800
 UNSUPPORTED_RETRY_SECONDS = 6 * 3600
+# A stream that stays connected at least this long counts as healthy — only
+# then do we reset the reconnect backoff. Guards against a proxy/overloaded
+# upstream that accepts the request (200) and drops it immediately: without
+# this, every such cycle would reset backoff and pin us to a ~30s reconnect
+# storm instead of backing off.
+STABLE_CONNECTION_SECONDS = RECONNECT_MIN_SECONDS
 # Safety-net poll interval while push is delivering updates
 PUSH_POLL_INTERVAL = timedelta(hours=6)
 
@@ -49,11 +56,16 @@ async def async_push_listener(coordinator: CellarionCoordinator) -> None:
     try:
         while True:
             connected = False
+            connected_at: float | None = None
             try:
                 async for event in coordinator.client.events_stream():
                     if event == "_connected":
                         connected = True
-                        backoff = RECONNECT_MIN_SECONDS
+                        connected_at = time.monotonic()
+                        # Note: backoff is NOT reset here — the 200 only proves
+                        # the request was accepted, not that the stream is
+                        # stable. It is reset below once the connection has
+                        # lasted STABLE_CONNECTION_SECONDS.
                         coordinator.update_interval = PUSH_POLL_INTERVAL
                         ir.async_delete_issue(
                             coordinator.hass, DOMAIN, PUSH_FORBIDDEN_ISSUE
@@ -105,6 +117,15 @@ async def async_push_listener(coordinator: CellarionCoordinator) -> None:
                     coordinator.update_interval = base_interval
 
             if connected:
+                # A connection that stayed up long enough was healthy — reset
+                # the backoff so the next reconnect is prompt. One that dropped
+                # almost immediately (flapping proxy/upstream) leaves the
+                # backoff growing so we don't hammer it.
+                if (
+                    connected_at is not None
+                    and time.monotonic() - connected_at >= STABLE_CONNECTION_SECONDS
+                ):
+                    backoff = RECONNECT_MIN_SECONDS
                 # Stream dropped: resume normal polling promptly and pick
                 # up anything missed during the gap.
                 await coordinator.async_request_refresh()

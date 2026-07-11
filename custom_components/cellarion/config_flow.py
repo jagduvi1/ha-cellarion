@@ -52,6 +52,19 @@ _LOGGER = logging.getLogger(__name__)
 DEFAULT_URL = "https://cellarion.app"
 
 
+def _normalize_url(raw: str) -> str | None:
+    """Clean a user-entered instance URL, or return None if it isn't valid.
+
+    Requires an http(s) scheme and a host — rejects typos like a bare host or
+    an accidental "javascript:"/"file:" paste before any credential is sent.
+    """
+    url = raw.strip().rstrip("/")
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        return None
+    return url
+
+
 async def _validate_token(hass: HomeAssistant, url: str, token: str) -> str | None:
     """Try a read call with the token. Return an error key or None."""
     client = CellarionApiClient(
@@ -141,31 +154,34 @@ class CellarionConfigFlow(ConfigFlow, domain=DOMAIN):
             url = (
                 entry.data[CONF_URL]
                 if entry and self._is_reauth
-                else user_input[CONF_URL].rstrip("/")
+                else _normalize_url(user_input[CONF_URL])
             )
             token = user_input[CONF_TOKEN].strip()
 
-            error = await _validate_token(self.hass, url, token)
-            if error:
-                errors["base"] = error
-            elif entry:
-                return await self._async_finish_existing(
-                    {
-                        CONF_URL: url,
-                        CONF_EMAIL: entry.data.get(CONF_EMAIL),
-                        CONF_TOKEN: token,
-                    }
-                )
+            if url is None:
+                errors["base"] = "invalid_url"
             else:
-                token_id = hashlib.sha256(token.encode()).hexdigest()[:12]
-                await self.async_set_unique_id(f"{url}_token_{token_id}")
-                self._abort_if_unique_id_configured()
-                host = urlparse(url).netloc or url
-                return self.async_create_entry(
-                    title=f"Cellarion ({host})",
-                    data={CONF_URL: url, CONF_TOKEN: token},
-                    options={CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL},
-                )
+                error = await _validate_token(self.hass, url, token)
+                if error:
+                    errors["base"] = error
+                elif entry:
+                    return await self._async_finish_existing(
+                        {
+                            CONF_URL: url,
+                            CONF_EMAIL: entry.data.get(CONF_EMAIL),
+                            CONF_TOKEN: token,
+                        }
+                    )
+                else:
+                    token_id = hashlib.sha256(token.encode()).hexdigest()[:12]
+                    await self.async_set_unique_id(f"{url}_token_{token_id}")
+                    self._abort_if_unique_id_configured()
+                    host = urlparse(url).netloc or url
+                    return self.async_create_entry(
+                        title=f"Cellarion ({host})",
+                        data={CONF_URL: url, CONF_TOKEN: token},
+                        options={CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL},
+                    )
 
         if entry and self._is_reauth:
             schema = vol.Schema({vol.Required(CONF_TOKEN): str})
@@ -194,52 +210,60 @@ class CellarionConfigFlow(ConfigFlow, domain=DOMAIN):
             url = (
                 entry.data[CONF_URL]
                 if entry and self._is_reauth
-                else user_input[CONF_URL].rstrip("/")
+                else _normalize_url(user_input[CONF_URL])
             )
-            email = user_input[CONF_EMAIL]
-            password = user_input[CONF_PASSWORD]
 
-            if not entry:
-                await self.async_set_unique_id(f"{url}_{email}")
-                self._abort_if_unique_id_configured()
+            if url is None:
+                errors["base"] = "invalid_url"
+            else:
+                email = user_input[CONF_EMAIL]
+                password = user_input[CONF_PASSWORD]
 
-            data: dict[str, Any] | None = None
-            client = CellarionApiClient(
-                async_get_clientsession(self.hass), url, email, password
-            )
-            try:
-                await client.authenticate()
-                try:
-                    name = f"Home Assistant ({self.hass.config.location_name})"
-                    token = await client.async_create_api_token(
-                        name[:60], TOKEN_SCOPES
-                    )
-                    data = {CONF_URL: url, CONF_EMAIL: email, CONF_TOKEN: token}
-                    _LOGGER.debug("Minted a scoped API token; password not stored")
-                except CellarionTokensNotSupported:
-                    # Older self-hosted server — fall back to password auth
-                    data = {
-                        CONF_URL: url,
-                        CONF_EMAIL: email,
-                        CONF_PASSWORD: password,
-                    }
-            except CellarionAuthError:
-                errors["base"] = "invalid_auth"
-            except CellarionApiError as err:
-                _LOGGER.error("Cannot connect to Cellarion at %s: %s", url, err)
-                errors["base"] = "cannot_connect"
-            except Exception:  # noqa: BLE001
-                _LOGGER.exception("Unexpected error during setup")
-                errors["base"] = "unknown"
+                if not entry:
+                    await self.async_set_unique_id(f"{url}_{email}")
+                    self._abort_if_unique_id_configured()
 
-            if data is not None:
-                if entry:
-                    return await self._async_finish_existing(data)
-                return self.async_create_entry(
-                    title=f"Cellarion ({email})",
-                    data=data,
-                    options={CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL},
+                data: dict[str, Any] | None = None
+                client = CellarionApiClient(
+                    async_get_clientsession(self.hass), url, email, password
                 )
+                try:
+                    await client.authenticate()
+                    try:
+                        name = f"Home Assistant ({self.hass.config.location_name})"
+                        token = await client.async_create_api_token(
+                            name[:60], TOKEN_SCOPES
+                        )
+                        data = {CONF_URL: url, CONF_EMAIL: email, CONF_TOKEN: token}
+                        _LOGGER.debug(
+                            "Minted a scoped API token; password not stored"
+                        )
+                    except CellarionTokensNotSupported:
+                        # Older self-hosted server — fall back to password auth
+                        data = {
+                            CONF_URL: url,
+                            CONF_EMAIL: email,
+                            CONF_PASSWORD: password,
+                        }
+                except CellarionAuthError:
+                    errors["base"] = "invalid_auth"
+                except CellarionApiError as err:
+                    _LOGGER.error(
+                        "Cannot connect to Cellarion at %s: %s", url, err
+                    )
+                    errors["base"] = "cannot_connect"
+                except Exception:  # noqa: BLE001
+                    _LOGGER.exception("Unexpected error during setup")
+                    errors["base"] = "unknown"
+
+                if data is not None:
+                    if entry:
+                        return await self._async_finish_existing(data)
+                    return self.async_create_entry(
+                        title=f"Cellarion ({email})",
+                        data=data,
+                        options={CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL},
+                    )
 
         if entry and self._is_reauth:
             schema = vol.Schema(

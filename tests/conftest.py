@@ -89,6 +89,8 @@ def mock_cellarion_api(
     login_status: int = 200,
     tokens_status: int = 200,
     stats_status: int = 200,
+    peak_status: int = 200,
+    peak_json: dict | None = None,
 ) -> None:
     """Register happy-path (or overridden) mocks for the Cellarion API."""
     if login_status == 200:
@@ -128,7 +130,15 @@ def mock_cellarion_api(
     aioclient_mock.get(
         f"{url}/api/health", json={"status": "ok", "version": "1.75.0"}
     )
-    aioclient_mock.get(f"{url}/api/bottles", json=PEAK_PAYLOAD)
+    if peak_status == 200:
+        aioclient_mock.get(
+            f"{url}/api/bottles",
+            json=peak_json if peak_json is not None else PEAK_PAYLOAD,
+        )
+    else:
+        aioclient_mock.get(
+            f"{url}/api/bottles", status=peak_status, json={"error": "no"}
+        )
     # No push support in tests — the listener falls back to polling
     aioclient_mock.get(f"{url}/api/events/stream", status=404)
 
