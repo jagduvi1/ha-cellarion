@@ -38,3 +38,8 @@ jobs:
           python-version: "3.13"
       - run: pip install pytest-homeassistant-custom-component
       - run: pytest tests -q
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      # The bundled Lovelace card has its own dependency-free unit tests
+      - run: node --test tests/*.test.mjs

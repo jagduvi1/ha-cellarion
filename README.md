@@ -16,6 +16,7 @@ Your wine data stays in your Cellarion account. This integration reads from the 
 ## Features
 
 - **Dashboard card included** — a ready-made card with collection stats, a drink-window bar, and the bottles that need attention; no extra install
+- **Hide what you like** — switch off any part of the card (collection value, lists, consume buttons); handy for a dashboard guests can see
 - **Collection overview** — total bottles, value, unique wines, average rating
 - **Drink window tracking** — bottles at peak, declining, not ready, early/late window
 - **Maturity alerts** — urgent bottles listed as sensor attributes
@@ -176,9 +177,42 @@ first), and a **Drink soon** list (declining/late bottles). Clicking any
 number opens the sensor's more-info dialog, the card title opens your
 Cellarion instance, and — on Cellarion v1.75+ — every listed bottle gets
 a one-tap consume button (with confirmation). For browsing your full
-inventory, follow the card link into Cellarion itself. If your
+inventory, follow the card link into Cellarion itself. Anything you'd
+rather not have on display can be switched off — see below. If your
 dashboards run in YAML mode, add `/cellarion-files/cellarion-card.js`
 as a module resource manually.
+
+#### Hiding parts of the card
+
+The card's parts can be switched off one by one — handy for a dashboard
+in a shared room where you'd rather not put the collection's value on
+display.
+All of them default to `true`; set the ones you don't want to `false`,
+either in YAML or with the **Show on the card** toggles in the card
+editor.
+
+| Option | Hides when `false` |
+|--------|--------------------|
+| `show_health` | Health score and grade in the header |
+| `show_bottles` | The **Bottles** stat |
+| `show_value` | The **Value** stat — your collection's worth |
+| `show_wines` | The **Wines** stat |
+| `show_drink_window` | The drink-window bar and its legend |
+| `show_ready` | The **Ready to drink** list |
+| `show_soon` | The **Drink soon** list |
+| `show_consume` | The one-tap consume buttons on listed bottles |
+
+```yaml
+# A guest-friendly card: no cellar value, and visitors can't mark bottles
+# as drunk by tapping.
+type: custom:cellarion-card
+title: Wine Cellar
+show_value: false
+show_consume: false
+```
+
+Hiding a stat only takes it off the card — the sensor itself stays
+available for automations, and the service-status warning is never hidden.
 
 ### Simple Entities Card
 

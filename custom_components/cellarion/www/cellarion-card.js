@@ -13,6 +13,10 @@
  *   entry_id: <config entry>     (optional — required only when more than one
  *                                 Cellarion account is configured, so the
  *                                 consume button targets the right one)
+ *   show_value: false            (optional — each show_* flag in TOGGLES
+ *                                 below defaults to true; set one to false
+ *                                 to keep that piece off the card, e.g. the
+ *                                 collection value on a shared dashboard)
  */
 
 const MATURITY = [
@@ -27,6 +31,24 @@ const STATUS_COLOR = {
   declining: "#D97706",
   late: "#DC2626",
 };
+
+// Pieces of the card that can be switched off from the config. All are
+// shown unless the config sets them to false, so existing cards and the
+// card picker's preview keep the full layout.
+const TOGGLES = [
+  { name: "show_health", label: "Health score" },
+  { name: "show_bottles", label: "Bottles count" },
+  { name: "show_value", label: "Collection value" },
+  { name: "show_wines", label: "Unique wines" },
+  { name: "show_drink_window", label: "Drink window bar" },
+  { name: "show_ready", label: "“Ready to drink” list" },
+  { name: "show_soon", label: "“Drink soon” list" },
+  { name: "show_consume", label: "Consume buttons" },
+];
+
+// Only an explicit false hides a piece; anything else (including a config
+// written before these options existed) shows it.
+const isShown = (config, name) => config?.[name] !== false;
 
 function esc(value) {
   return String(value ?? "").replace(/[&<>"']/g, (c) => ({
@@ -50,6 +72,10 @@ class CellarionCard extends HTMLElement {
       ...config,
     };
     this._fingerprint = null;
+    // Re-render right away when the config of a live card changes (the
+    // editor preview does that) instead of waiting for the next state
+    // update to come in.
+    if (this._hass) this.hass = this._hass;
   }
 
   set hass(hass) {
@@ -62,7 +88,19 @@ class CellarionCard extends HTMLElement {
   }
 
   getCardSize() {
-    return 5;
+    // Rough row count for the masonry layout: start from the full card and
+    // give back the rows the hidden pieces would have taken.
+    let size = 5;
+    if (!this._show("show_bottles") && !this._show("show_value")
+        && !this._show("show_wines")) size -= 1;
+    if (!this._show("show_drink_window")) size -= 2;
+    if (!this._show("show_ready")) size -= 1;
+    if (!this._show("show_soon")) size -= 1;
+    return Math.max(1, size);
+  }
+
+  _show(name) {
+    return isShown(this._config, name);
   }
 
   _entityIds() {
@@ -179,13 +217,13 @@ class CellarionCard extends HTMLElement {
           <span class="cnt">${c.count}</span>
         </div>`).join("");
 
-    const consumeBtn = (b) => b.id ? `
+    const consumeBtn = (b) => b.id && this._show("show_consume") ? `
             <button class="consume" data-bottle="${esc(b.id)}"
                     data-name="${esc(b.name)}" title="Mark as drunk">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>
             </button>` : "";
 
-    const readyHtml = ready.length ? `
+    const readyHtml = this._show("show_ready") && ready.length ? `
       <div class="section-label">Ready to drink</div>
       <div class="urgent">
         ${ready.map((b) => `
@@ -199,7 +237,7 @@ class CellarionCard extends HTMLElement {
         ${moreLine(peak, ready.length)}
       </div>` : "";
 
-    const urgentHtml = urgent.length ? `
+    const urgentHtml = this._show("show_soon") && urgent.length ? `
       <div class="section-label">Drink soon</div>
       <div class="urgent">
         ${urgent.map((b) => `
@@ -212,6 +250,27 @@ class CellarionCard extends HTMLElement {
           </div>`).join("")}
         ${moreLine(urgentTotal, urgent.length)}
       </div>` : "";
+
+    const statTiles = [
+      { name: "show_bottles", entity: "_total_bottles", label: "Bottles",
+        value: bottles ?? "—" },
+      { name: "show_value", entity: "_collection_value", label: "Value",
+        value: this._formatValue() },
+      { name: "show_wines", entity: "_unique_wines", label: "Wines",
+        value: wines ?? "—" },
+    ].filter((t) => this._show(t.name));
+    const statsHtml = statTiles.length ? `
+        <div class="stats">
+          ${statTiles.map((t) => `
+          <div class="stat" data-entity="${esc(this._config.prefix + t.entity)}">
+            <div class="v">${esc(t.value)}</div><div class="l">${esc(t.label)}</div>
+          </div>`).join("")}
+        </div>` : "";
+
+    const windowHtml = this._show("show_drink_window") ? `
+        <div class="section-label">Drink window${maturityTotal ? ` · ${maturityTotal} bottles` : ""}</div>
+        <div class="bar">${bar}</div>
+        <div class="legend">${legend}</div>` : "";
 
     const serviceMsg =
       ["unavailable", "unknown", "unreachable"].includes(service)
@@ -282,26 +341,14 @@ class CellarionCard extends HTMLElement {
             ? `<a class="title" href="${esc(link)}" target="_blank"
                   rel="noopener" title="Open Cellarion">${esc(this._config.title)}<span class="ext">↗</span></a>`
             : `<div class="title">${esc(this._config.title)}</div>`}
-          ${health != null ? `
+          ${health != null && this._show("show_health") ? `
             <div class="health" data-entity="${esc(this._config.prefix)}_collection_health_score">
               <span>${health}</span>
               ${grade ? `<span class="grade">${esc(grade)}</span>` : ""}
             </div>` : ""}
         </div>
-        <div class="stats">
-          <div class="stat" data-entity="${esc(this._config.prefix)}_total_bottles">
-            <div class="v">${bottles ?? "—"}</div><div class="l">Bottles</div>
-          </div>
-          <div class="stat" data-entity="${esc(this._config.prefix)}_collection_value">
-            <div class="v">${esc(this._formatValue())}</div><div class="l">Value</div>
-          </div>
-          <div class="stat" data-entity="${esc(this._config.prefix)}_unique_wines">
-            <div class="v">${wines ?? "—"}</div><div class="l">Wines</div>
-          </div>
-        </div>
-        <div class="section-label">Drink window${maturityTotal ? ` · ${maturityTotal} bottles` : ""}</div>
-        <div class="bar">${bar}</div>
-        <div class="legend">${legend}</div>
+        ${statsHtml}
+        ${windowHtml}
         ${readyHtml}
         ${urgentHtml}
         ${serviceHtml}
@@ -346,28 +393,60 @@ class CellarionCardEditor extends HTMLElement {
     if (this._form) this._form.hass = hass;
   }
 
+  // Give the form an explicit boolean per toggle that mirrors what the card
+  // does with the config (an unset one would otherwise render as an
+  // unticked box on a card that does show that piece)...
+  _formData() {
+    return {
+      ...this._config,
+      ...Object.fromEntries(
+        TOGGLES.map((t) => [t.name, isShown(this._config, t.name)]),
+      ),
+    };
+  }
+
+  // ...and drop the ones left on again on the way out, so a config only
+  // ever carries the pieces the user actually turned off.
+  static _prune(value) {
+    const config = { ...value };
+    for (const t of TOGGLES) {
+      if (isShown(config, t.name)) delete config[t.name];
+    }
+    return config;
+  }
+
   _render() {
     if (this._form) {
-      this._form.data = this._config;
+      this._form.data = this._formData();
       return;
     }
     this._form = document.createElement("ha-form");
     this._form.hass = this._hass;
-    this._form.data = this._config;
+    this._form.data = this._formData();
     this._form.schema = [
       { name: "title", selector: { text: {} } },
       { name: "prefix", selector: { text: {} } },
       { name: "url", selector: { text: {} } },
       { name: "entry_id", selector: { config_entry: { integration: "cellarion" } } },
+      {
+        name: "",
+        type: "expandable",
+        title: "Show on the card",
+        icon: "mdi:eye-outline",
+        schema: TOGGLES.map((t) => ({
+          name: t.name, selector: { boolean: {} },
+        })),
+      },
     ];
     this._form.computeLabel = (s) => ({
       title: "Title",
       prefix: "Entity prefix",
       url: "Link URL (optional)",
       entry_id: "Account (only if you have several)",
+      ...Object.fromEntries(TOGGLES.map((t) => [t.name, t.label])),
     }[s.name] || s.name);
     this._form.addEventListener("value-changed", (ev) => {
-      this._config = ev.detail.value;
+      this._config = CellarionCardEditor._prune(ev.detail.value);
       this.dispatchEvent(new CustomEvent("config-changed", {
         bubbles: true, composed: true, detail: { config: this._config },
       }));
