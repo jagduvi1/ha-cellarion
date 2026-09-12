@@ -22,7 +22,7 @@ class FakeElement {
   }
 
   attachShadow() {
-    this.shadowRoot = { innerHTML: "", querySelectorAll: () => [] };
+    this.shadowRoot = new FakeShadowRoot();
     return this.shadowRoot;
   }
 
@@ -47,6 +47,61 @@ class FakeElement {
     for (const handler of this._listeners[type] || []) {
       handler({ type, detail, stopPropagation() {} });
     }
+  }
+}
+
+class FakeNode {
+  constructor(attrs) {
+    this.attributes = attrs;
+    this.dataset = Object.fromEntries(
+      Object.entries(attrs)
+        .filter(([k]) => k.startsWith("data-"))
+        .map(([k, v]) => [k.slice(5).replace(/-(\w)/g, (_, ch) => ch.toUpperCase()), v]),
+    );
+    this.disabled = false;
+    this.focused = false;
+    this._listeners = {};
+    this.classList = {
+      names: new Set((attrs.class || "").split(/\s+/).filter(Boolean)),
+      add(n) { this.names.add(n); },
+      contains(n) { return this.names.has(n); },
+    };
+  }
+  addEventListener(type, handler) { (this._listeners[type] ??= []).push(handler); }
+  setAttribute(k, v) { this.attributes[k] = String(v); }
+  removeAttribute(k) { delete this.attributes[k]; }
+  getAttribute(k) { return this.attributes[k] ?? null; }
+  focus() { this.focused = true; }
+  fire(type, init = {}) {
+    for (const h of this._listeners[type] || []) {
+      h({ type, ...init, stopPropagation() {}, preventDefault() {} });
+    }
+  }
+}
+
+/** Parses the rendered HTML just enough to find tags and their attributes. */
+class FakeShadowRoot {
+  constructor() { this.innerHTML = ""; this._nodes = null; this.activeElement = null; }
+  _all() {
+    if (this._nodes?.html === this.innerHTML) return this._nodes.list;
+    const list = [];
+    for (const m of this.innerHTML.matchAll(/<(\w[\w-]*)((?:\s+[\w-]+(?:="[^"]*")?)*)\s*\/?>/g)) {
+      const attrs = {};
+      for (const a of m[2].matchAll(/([\w-]+)(?:="([^"]*)")?/g)) attrs[a[1]] = a[2] ?? "";
+      list.push(new FakeNode({ tag: m[1], ...attrs }));
+    }
+    this._nodes = { html: this.innerHTML, list };
+    return list;
+  }
+  querySelectorAll(sel) {
+    const all = this._all();
+    if (sel === "[data-entity]") return all.filter((n) => "data-entity" in n.attributes);
+    if (sel === "button.consume") return all.filter((n) => n.attributes.tag === "button" && n.classList.contains("consume"));
+    throw new Error("unsupported selector in stub: " + sel);
+  }
+  querySelector(sel) {
+    const m = /^\[(data-[\w-]+)="([^"]*)"\]$/.exec(sel);
+    return m ? this._all().find((n) => n.attributes[m[1]] === m[2]) ?? null : null;
   }
 }
 
@@ -278,4 +333,251 @@ test("the editor keeps a hidden piece hidden across re-renders", () => {
   assert.equal(editor.children.length, 1, "the form is created once");
   assert.equal(form.data.show_value, false);
   assert.equal(form.data.title, "Cellar");
+});
+
+
+// ── Entity resolution through the registry ─────────────────────────
+
+const ENTRY_A = "entry-a";
+const ENTRY_B = "entry-b";
+
+/** A hass with two Cellarion accounts, the second one with renamed ids. */
+function registryHass() {
+  const hass = fakeHass();
+  const keys = {
+    total_bottles: "_total_bottles", collection_value: "_collection_value",
+    unique_wines: "_unique_wines", health_score: "_collection_health_score",
+    service_health: "_service_status", bottles_not_ready: "_bottles_not_ready",
+    bottles_early: "_bottles_early_window", bottles_at_peak: "_bottles_at_peak",
+    bottles_declining: "_bottles_declining", bottles_late: "_bottles_late_window",
+  };
+  hass.entities = {};
+  hass.devices = {
+    "dev-a": { id: "dev-a", config_entries: [ENTRY_A], primary_config_entry: ENTRY_A },
+    "dev-b": { id: "dev-b", config_entries: [ENTRY_B], primary_config_entry: ENTRY_B },
+  };
+  for (const [key, suffix] of Object.entries(keys)) {
+    hass.entities["sensor.cellarion" + suffix] = {
+      entity_id: "sensor.cellarion" + suffix, platform: "cellarion",
+      translation_key: key, device_id: "dev-a",
+    };
+    // Second account: HA de-duplicated its ids with a _2 suffix, and the
+    // user renamed one of them by hand
+    const id2 = key === "total_bottles"
+      ? "sensor.summer_house_bottles" : "sensor.cellarion" + suffix + "_2";
+    hass.entities[id2] = {
+      entity_id: id2, platform: "cellarion", translation_key: key, device_id: "dev-b",
+    };
+  }
+  hass.states["sensor.summer_house_bottles"] = state(7);
+  hass.states["sensor.cellarion_unique_wines_2"] = state(5);
+  hass.states["sensor.cellarion_collection_value_2"] = state(900, { currency: "EUR" });
+  hass.states["sensor.cellarion_service_status_2"] = state("ok", {});
+  hass.states["sensor.cellarion_bottles_at_peak_2"] = state(3, {
+    peak_bottles: [{ id: "b9", name: "Summer Rosé", vintage: 2024, drink_to: 2026 }],
+  });
+  hass.states["sensor.cellarion_bottles_declining_2"] = state(0, { urgent_bottles: [] });
+  return hass;
+}
+
+test("with one account the card finds its entities through the registry", () => {
+  const hass = registryHass();
+  delete hass.devices["dev-b"];
+  for (const [id, e] of Object.entries(hass.entities)) if (e.device_id === "dev-b") delete hass.entities[id];
+  const html = render({}, hass);
+  assert.ok(html.includes('data-entity="sensor.cellarion_total_bottles"'));
+  assert.ok(html.includes(">128<"));
+});
+
+test("entry_id selects the second account even with renamed ids", () => {
+  const html = render({ entry_id: ENTRY_B }, registryHass());
+  assert.ok(html.includes('data-entity="sensor.summer_house_bottles"'));
+  assert.ok(html.includes(">7<"), "bottle count of account B");
+  assert.ok(html.includes("Summer Rosé"));
+  assert.ok(!html.includes("Barolo Cannubi"), "account A's list must not leak in");
+});
+
+test("with several accounts and no entry_id the first one set up is shown", () => {
+  const html = render({}, registryHass());
+  assert.ok(html.includes('data-entity="sensor.cellarion_total_bottles"'));
+  assert.ok(html.includes(">128<"));
+});
+
+test("an entry_id that matches no account explains itself", () => {
+  const html = render({ entry_id: "gone" }, registryHass());
+  assert.match(html, /No Cellarion account matches/);
+  assert.ok(html.includes("entry_id: gone"));
+});
+
+test("an explicit prefix bypasses the registry", () => {
+  const hass = registryHass();
+  hass.states["sensor.custom_total_bottles"] = state(3);
+  const html = render({ prefix: "sensor.custom" }, hass);
+  assert.ok(html.includes('data-entity="sensor.custom_total_bottles"'));
+  assert.ok(html.includes(">3<"));
+});
+
+test("an empty or blank prefix falls back to the default ids", () => {
+  for (const prefix of ["", "   "]) {
+    const html = render({ prefix });
+    assert.ok(html.includes('data-entity="sensor.cellarion_total_bottles"'), JSON.stringify(prefix));
+  }
+});
+
+test("a non-string prefix is rejected so HA shows its error card", () => {
+  const card = new CellarionCard();
+  assert.throws(() => card.setConfig({ prefix: 42 }), /prefix must be a string/);
+});
+
+test("the stub config no longer pins a prefix", () => {
+  assert.deepEqual(CellarionCard.getStubConfig(), { title: "Wine Cellar" });
+});
+
+test("the editor drops cleared text fields", () => {
+  const editor = new CellarionCardEditor();
+  editor.setConfig({ type: "custom:cellarion-card", prefix: "sensor.x" });
+  const form = editor.children[0];
+  form.fire("value-changed", { value: { type: "custom:cellarion-card", prefix: "", url: "  ", title: "Cellar" } });
+  assert.deepEqual(editor.dispatched[0].detail.config, { type: "custom:cellarion-card", title: "Cellar" });
+});
+
+// ── Accessibility, theming and status text ──────────────────────────
+
+test("interactive pieces carry accessible names", () => {
+  const html = render();
+  assert.match(html, /aria-label="Mark Barolo Cannubi as drunk"/);
+  assert.match(html, /aria-label="At peak: 12 bottles"/);
+  assert.match(html, /aria-label="Health score 82, grade A"/);
+  assert.match(html, /class="bar" role="img" aria-label="Drink window: Not ready 30, Early 20, At peak 12, Declining 4, Late 2"/);
+  assert.match(html, /<ha-icon icon="mdi:bottle-wine" aria-hidden="true">/);
+});
+
+test("semantic colours are theme tokens with contrast-mixed text", () => {
+  const html = render();
+  assert.match(html, /var\(--cellarion-peak-color, #059669\)/);
+  assert.match(html, /color-mix\(in srgb, var\(--cellarion-warn-color, #D97706\) 72%, var\(--primary-text-color\)\)/);
+  assert.ok(!/color:#[0-9A-F]{6}/i.test(html), "no raw hex used directly as a text colour");
+});
+
+test("an unknown service status is not reported as unreachable", () => {
+  const unknown = render({}, fakeHass({ "sensor.cellarion_service_status": state("unknown") }));
+  assert.match(unknown, /status is unknown/);
+  const down = render({}, fakeHass({ "sensor.cellarion_service_status": state("unreachable") }));
+  assert.match(down, /Cannot reach Cellarion/);
+});
+
+test("a status the server invents does not reach the prototype chain", () => {
+  const hass = fakeHass({
+    "sensor.cellarion_bottles_declining": state(1, {
+      urgent_bottles: [{ id: "b3", name: "Odd", vintage: 2000, status: "constructor" }],
+    }),
+  });
+  const html = render({}, hass);
+  assert.ok(!html.includes("function"), "prototype lookup leaked");
+  assert.match(html, /--cellarion-warn-color/);
+});
+
+test("numbers follow the HA locale and a missing currency shows a bare number", () => {
+  const hass = fakeHass({
+    "sensor.cellarion_total_bottles": state(12345),
+    "sensor.cellarion_collection_value": state(4210, {}),
+  });
+  hass.locale = { language: "de" };
+  const html = render({}, hass);
+  assert.ok(html.includes(">12.345<"), "German thousands separator");
+  assert.ok(html.includes(">4.210<"), "value without an invented currency");
+});
+
+test("a locale change re-renders the card", () => {
+  const hass = fakeHass({ "sensor.cellarion_total_bottles": state(12345) });
+  const card = new CellarionCard();
+  card.setConfig({});
+  card.hass = hass;
+  assert.ok(card.shadowRoot.innerHTML.includes(">12,345<"));
+  card.hass = { ...hass, locale: { language: "de" } };
+  assert.ok(card.shadowRoot.innerHTML.includes(">12.345<"));
+});
+
+// ── Interaction: clicks, keyboard, consume ──────────────────────────
+
+test("tiles open more-info on click and on Enter", () => {
+  const card = new CellarionCard();
+  card.setConfig({});
+  card.hass = fakeHass();
+  const tile = card.shadowRoot.querySelectorAll("[data-entity]")
+    .find((n) => n.dataset.entity === "sensor.cellarion_total_bottles");
+  assert.equal(tile.getAttribute("role"), "button");
+  assert.equal(tile.getAttribute("tabindex"), "0");
+  tile.fire("click");
+  tile.fire("keydown", { key: "Enter" });
+  tile.fire("keydown", { key: "x" });
+  const opened = card.dispatched.filter((e) => e.type === "hass-more-info");
+  assert.equal(opened.length, 2);
+  assert.equal(opened[0].detail.entityId, "sensor.cellarion_total_bottles");
+});
+
+test("the consume button calls the service once, with entry_id, and locks itself", async () => {
+  const calls = [];
+  let resolveCall;
+  const hass = fakeHass();
+  hass.callService = (...args) => { calls.push(args); return new Promise((r) => { resolveCall = r; }); };
+  globalThis.confirm = () => true;
+  const card = new CellarionCard();
+  card.setConfig({ entry_id: "entry-a" });
+  card.hass = hass;
+  const [btn] = card.shadowRoot.querySelectorAll("button.consume");
+  btn.fire("click");
+  btn.fire("click"); // double tap while in flight
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0], ["cellarion", "consume_bottle", { bottle_id: "b1", entry_id: "entry-a" }]);
+  assert.equal(btn.disabled, true);
+  assert.equal(btn.getAttribute("aria-busy"), "true");
+  resolveCall();
+  await new Promise((r) => setTimeout(r, 0));
+  assert.ok(btn.classList.contains("done"));
+  assert.match(btn.getAttribute("aria-label"), /marked as drunk/);
+});
+
+test("a failed consume call unlocks the button again", async () => {
+  const hass = fakeHass();
+  hass.callService = () => Promise.reject(new Error("nope"));
+  globalThis.confirm = () => true;
+  const card = new CellarionCard();
+  card.setConfig({});
+  card.hass = hass;
+  const [btn] = card.shadowRoot.querySelectorAll("button.consume");
+  btn.fire("click");
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(btn.disabled, false);
+  assert.equal(btn.getAttribute("aria-busy"), null);
+});
+
+test("declining the confirmation sends nothing", () => {
+  const calls = [];
+  const hass = fakeHass();
+  hass.callService = (...args) => { calls.push(args); };
+  globalThis.confirm = () => false;
+  const card = new CellarionCard();
+  card.setConfig({});
+  card.hass = hass;
+  card.shadowRoot.querySelectorAll("button.consume")[0].fire("click");
+  assert.equal(calls.length, 0);
+});
+
+test("keyboard focus survives a re-render", () => {
+  const card = new CellarionCard();
+  card.setConfig({});
+  card.hass = fakeHass();
+  const [btn] = card.shadowRoot.querySelectorAll("button.consume");
+  card.shadowRoot.activeElement = btn;
+  card.hass = fakeHass({ "sensor.cellarion_total_bottles": state(129) });
+  const again = card.shadowRoot.querySelector('[data-bottle="b1"]');
+  assert.ok(again && again !== btn, "a new node was rendered");
+  assert.equal(again.focused, true);
+});
+
+test("javascript: links never become the title link", () => {
+  const html = render({ url: "javascript:alert(1)" });
+  assert.ok(!html.includes("javascript:"));
+  assert.match(html, /<div class="title">Wine Cellar<\/div>/);
 });
