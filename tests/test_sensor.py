@@ -150,3 +150,41 @@ async def test_peak_bottles_malformed_payload_isolated(
     assert hass.states.get("sensor.cellarion_total_bottles").state == "42"
     peak = hass.states.get("sensor.cellarion_bottles_at_peak")
     assert peak.attributes["peak_bottles"] == []
+
+
+async def test_service_status_is_an_enum(hass: HomeAssistant, aioclient_mock, token_entry) -> None:
+    """The service-status sensor exposes its options and maps odd values to unknown."""
+    await _setup(hass, aioclient_mock, token_entry)
+    status = hass.states.get("sensor.cellarion_service_status")
+    assert status.state == "ok"
+    assert status.attributes["device_class"] == "enum"
+    assert status.attributes["options"] == ["ok", "degraded", "unreachable", "unknown"]
+
+    from custom_components.cellarion.coordinator import _health_state
+
+    assert _health_state("DEGRADED") == "degraded"
+    assert _health_state("on-fire") == "unknown"
+    assert _health_state(None) == "unknown"
+
+
+async def test_peak_bottles_unsortable_payload_isolated(
+    hass: HomeAssistant, aioclient_mock, token_entry
+) -> None:
+    """Mixed-type drink_to values make the sort fail; the rest still loads."""
+    token_entry.add_to_hass(hass)
+    mock_cellarion_api(
+        aioclient_mock,
+        peak_json={
+            "bottles": {
+                "items": [
+                    {"_id": "A", "drinkTo": 2027, "wineDefinition": {"name": "A"}},
+                    {"_id": "B", "drinkTo": "soon", "wineDefinition": {"name": "B"}},
+                ]
+            }
+        },
+    )
+    assert await hass.config_entries.async_setup(token_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert hass.states.get("sensor.cellarion_total_bottles").state == "42"
+    assert hass.states.get("sensor.cellarion_bottles_at_peak").attributes["peak_bottles"] == []

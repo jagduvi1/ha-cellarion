@@ -7,12 +7,11 @@ from types import SimpleNamespace
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import issue_registry as ir
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.cellarion.const import DOMAIN
 from custom_components.cellarion.push import PUSH_FORBIDDEN_ISSUE, push_issue_id
 
-from .conftest import BASE_URL, NEW_TOKEN, STATS_PAYLOAD, mock_cellarion_api
+from .conftest import BASE_URL, STATS_PAYLOAD, mock_cellarion_api
 
 
 async def test_setup_token_entry(hass: HomeAssistant, aioclient_mock, token_entry) -> None:
@@ -34,54 +33,6 @@ async def test_setup_token_entry(hass: HomeAssistant, aioclient_mock, token_entr
     assert token_entry.state is ConfigEntryState.NOT_LOADED
 
 
-async def test_password_entry_migrates_to_token(
-    hass: HomeAssistant, aioclient_mock, password_entry
-) -> None:
-    """Legacy password entries mint a token and drop the password."""
-    password_entry.add_to_hass(hass)
-    mock_cellarion_api(aioclient_mock)
-
-    assert await hass.config_entries.async_setup(password_entry.entry_id)
-    await hass.async_block_till_done()
-
-    assert password_entry.state is ConfigEntryState.LOADED
-    assert password_entry.data["token"] == NEW_TOKEN
-    assert "password" not in password_entry.data
-    assert password_entry.data["email"] == "user@example.com"
-
-
-async def test_password_entry_kept_on_old_server(
-    hass: HomeAssistant, aioclient_mock, password_entry
-) -> None:
-    """Servers without token support keep password auth working."""
-    password_entry.add_to_hass(hass)
-    mock_cellarion_api(aioclient_mock, tokens_status=404)
-
-    assert await hass.config_entries.async_setup(password_entry.entry_id)
-    await hass.async_block_till_done()
-
-    assert password_entry.state is ConfigEntryState.LOADED
-    assert password_entry.data["password"] == "hunter2"
-    assert "token" not in password_entry.data
-
-
-async def test_bad_password_starts_reauth(
-    hass: HomeAssistant, aioclient_mock, password_entry
-) -> None:
-    """A rejected stored password fails setup and opens a reauth flow."""
-    password_entry.add_to_hass(hass)
-    mock_cellarion_api(aioclient_mock, login_status=401)
-
-    assert not await hass.config_entries.async_setup(password_entry.entry_id)
-    await hass.async_block_till_done()
-
-    assert password_entry.state is ConfigEntryState.SETUP_ERROR
-    flows = hass.config_entries.flow.async_progress()
-    assert any(
-        flow["handler"] == DOMAIN and flow["context"]["source"] == "reauth" for flow in flows
-    )
-
-
 async def test_revoked_token_starts_reauth(
     hass: HomeAssistant, aioclient_mock, token_entry
 ) -> None:
@@ -95,30 +46,6 @@ async def test_revoked_token_starts_reauth(
     assert token_entry.state is ConfigEntryState.SETUP_ERROR
     flows = hass.config_entries.flow.async_progress()
     assert any(flow["handler"] == DOMAIN for flow in flows)
-
-
-async def test_migration_keeps_account_id(hass: HomeAssistant, aioclient_mock) -> None:
-    """The token rewrite must carry the account id the reauth guard relies on."""
-    entry = MockConfigEntry(
-        domain=DOMAIN,
-        title="Cellarion (user@example.com)",
-        unique_id=f"{BASE_URL}_user@example.com",
-        data={
-            "url": BASE_URL,
-            "email": "user@example.com",
-            "password": "hunter2",
-            "account_id": "ACCOUNT-A",
-        },
-        options={"scan_interval": 1800},
-    )
-    entry.add_to_hass(hass)
-    mock_cellarion_api(aioclient_mock)
-
-    assert await hass.config_entries.async_setup(entry.entry_id)
-    await hass.async_block_till_done()
-
-    assert entry.data["token"] == NEW_TOKEN
-    assert entry.data["account_id"] == "ACCOUNT-A"
 
 
 async def test_unload_clears_push_issue(hass: HomeAssistant, aioclient_mock, token_entry) -> None:
@@ -182,21 +109,6 @@ async def test_null_payload_sections_do_not_break_setup(
     assert hass.states.get("sensor.cellarion_bottles_at_peak").state == "0"
     assert hass.states.get("sensor.cellarion_service_status").state == "unreachable"
     assert hass.states.get("sensor.cellarion_unread_notifications").state == "0"
-
-
-async def test_migration_postponed_when_server_errors(
-    hass: HomeAssistant, aioclient_mock, password_entry
-) -> None:
-    """A transient error minting the token keeps password auth and still loads."""
-    password_entry.add_to_hass(hass)
-    mock_cellarion_api(aioclient_mock, tokens_status=500)
-
-    assert await hass.config_entries.async_setup(password_entry.entry_id)
-    await hass.async_block_till_done()
-
-    assert password_entry.state is ConfigEntryState.LOADED
-    assert password_entry.data["password"] == "hunter2"
-    assert "token" not in password_entry.data
 
 
 async def test_missing_scope_at_setup_starts_reauth(
@@ -306,3 +218,97 @@ async def test_card_registration_never_blocks_setup(
     await hass.async_block_till_done()
     assert token_entry.state is ConfigEntryState.LOADED
     assert "YAML mode" in caplog.text
+
+
+async def test_legacy_password_entry_needs_reauth(
+    hass: HomeAssistant, aioclient_mock, password_entry
+) -> None:
+    """An entry that still holds a password is retired into the reauth flow."""
+    password_entry.add_to_hass(hass)
+    mock_cellarion_api(aioclient_mock)
+
+    assert not await hass.config_entries.async_setup(password_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert password_entry.state is ConfigEntryState.SETUP_ERROR
+    assert password_entry.error_reason_translation_key == "password_entry_retired"
+    # No request was made with the stored password
+    assert not aioclient_mock.mock_calls
+    assert any(
+        flow["handler"] == DOMAIN and flow["context"]["source"] == "reauth"
+        for flow in hass.config_entries.flow.async_progress()
+    )
+
+
+async def test_server_error_at_setup_retries_later(
+    hass: HomeAssistant, aioclient_mock, token_entry
+) -> None:
+    """A 5xx during the first refresh is a retry, not an auth failure."""
+    token_entry.add_to_hass(hass)
+    mock_cellarion_api(aioclient_mock, stats_status=503)
+
+    assert not await hass.config_entries.async_setup(token_entry.entry_id)
+    await hass.async_block_till_done()
+    assert token_entry.state is ConfigEntryState.SETUP_RETRY
+    assert not hass.config_entries.flow.async_progress()
+
+
+async def test_options_change_reloads_entry(
+    hass: HomeAssistant, aioclient_mock, token_entry
+) -> None:
+    """Saving new options reloads the entry with the new interval."""
+    token_entry.add_to_hass(hass)
+    mock_cellarion_api(aioclient_mock)
+    assert await hass.config_entries.async_setup(token_entry.entry_id)
+    await hass.async_block_till_done()
+    first = token_entry.runtime_data
+
+    hass.config_entries.async_update_entry(token_entry, options={"scan_interval": 900})
+    await hass.async_block_till_done()
+
+    assert token_entry.state is ConfigEntryState.LOADED
+    assert token_entry.runtime_data is not first
+    assert token_entry.runtime_data.update_interval.total_seconds() == 900
+
+
+async def test_remove_entry_clears_push_issue(
+    hass: HomeAssistant, aioclient_mock, token_entry
+) -> None:
+    """Deleting the integration removes its repair issue."""
+    token_entry.add_to_hass(hass)
+    mock_cellarion_api(aioclient_mock)
+    assert await hass.config_entries.async_setup(token_entry.entry_id)
+    await hass.async_block_till_done()
+    ir.async_create_issue(
+        hass,
+        DOMAIN,
+        push_issue_id(token_entry.entry_id),
+        is_fixable=False,
+        severity=ir.IssueSeverity.WARNING,
+        translation_key=PUSH_FORBIDDEN_ISSUE,
+    )
+
+    await hass.config_entries.async_remove(token_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert ir.async_get(hass).async_get_issue(DOMAIN, push_issue_id(token_entry.entry_id)) is None
+
+
+class _BrokenResources:
+    loaded = False
+
+    async def async_load(self) -> None:
+        raise RuntimeError("storage exploded")
+
+
+async def test_card_registration_failure_is_only_a_warning(
+    hass: HomeAssistant, aioclient_mock, token_entry, caplog
+) -> None:
+    hass.data["lovelace"] = _lovelace(_BrokenResources())
+    token_entry.add_to_hass(hass)
+    mock_cellarion_api(aioclient_mock)
+
+    assert await hass.config_entries.async_setup(token_entry.entry_id)
+    await hass.async_block_till_done()
+    assert token_entry.state is ConfigEntryState.LOADED
+    assert "Could not register the Cellarion card automatically" in caplog.text

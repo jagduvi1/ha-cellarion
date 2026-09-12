@@ -72,9 +72,9 @@ def _unique_id(url: str, account_id: str | None, fallback: str) -> str:
     """Identity of an entry: the account on that instance.
 
     Prefers the server's account id so the same account can't be added twice
-    with different tokens or via token and password. Older servers that
-    can't say who the credential belongs to fall back to a credential-based
-    id (email, or a hash of the token).
+    with different tokens or via token and password. Servers that can't say
+    who the credential belongs to fall back to a credential-based id (email,
+    or a hash of the token).
     """
     return f"{url}_{account_id}" if account_id else f"{url}_{fallback}"
 
@@ -230,7 +230,11 @@ class CellarionConfigFlow(ConfigFlow, domain=DOMAIN):
     async def async_step_password(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Authenticate with email+password; mint and store an API token."""
+        """Authenticate with email+password to mint an API token.
+
+        The password is used once, for the login and the token mint, and
+        never stored. Servers without token support are refused.
+        """
         errors: dict[str, str] = {}
         entry = self._entry
 
@@ -263,15 +267,12 @@ class CellarionConfigFlow(ConfigFlow, domain=DOMAIN):
                         data = {CONF_URL: url, CONF_EMAIL: email, CONF_TOKEN: token}
                         _LOGGER.debug("Minted a scoped API token; password not stored")
                     except CellarionTokensNotSupported:
-                        # Older self-hosted server — fall back to password auth
-                        data = {
-                            CONF_URL: url,
-                            CONF_EMAIL: email,
-                            CONF_PASSWORD: password,
-                        }
+                        # The password is never stored: a server without API
+                        # tokens (Cellarion < 1.75) has to be updated first
+                        errors["base"] = "server_too_old"
                     # Keep any previously stored id if the server can't supply one
                     resolved = account_id or (entry.data.get(CONF_ACCOUNT_ID) if entry else None)
-                    if resolved:
+                    if data is not None and resolved:
                         data[CONF_ACCOUNT_ID] = resolved
                 except CellarionAuthError:
                     errors["base"] = "invalid_auth"

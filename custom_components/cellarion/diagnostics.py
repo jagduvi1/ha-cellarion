@@ -44,7 +44,6 @@ async def async_get_config_entry_diagnostics(
         "entry": {
             "data": async_redact_data(dict(entry.data), TO_REDACT),
             "options": dict(entry.options),
-            "auth_method": "token" if CONF_TOKEN in entry.data else "password",
         },
         "coordinator": {
             "last_update_success": coordinator.last_update_success,
