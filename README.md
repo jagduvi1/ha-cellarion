@@ -164,12 +164,18 @@ automatically — no extra install. Add it from the dashboard card picker
 ```yaml
 type: custom:cellarion-card
 title: Wine Cellar          # optional
-prefix: sensor.cellarion    # optional — entity id prefix
 url: https://cellarion.app  # optional — overrides the title link target
-entry_id: <config entry>    # optional — only if you run more than one
-                            #   Cellarion account, so the consume button
-                            #   targets the right one (pick it in the editor)
+entry_id: <config entry>    # optional — picks the account when you run more
+                            #   than one (choose it in the card editor)
 ```
+
+The card finds its sensors through Home Assistant's entity registry, so
+it keeps working if you rename entity ids, and a second Cellarion account
+(whose entities Home Assistant names `sensor.cellarion_…_2`) is selected
+with `entry_id`. Without `entry_id` and with several accounts, the card
+shows the one that was set up first. If you ever need to force a specific
+set of entity ids, the **Advanced** section of the editor (or
+`prefix: sensor.cellarion` in YAML) does that.
 
 It shows your collection stats, a drink-window distribution bar, a
 **Ready to drink** list (bottles at their peak, soonest-closing window
@@ -213,6 +219,28 @@ show_consume: false
 
 Hiding a stat only takes it off the card — the sensor itself stays
 available for automations, and the service-status warning is never hidden.
+
+#### Theming
+
+The card takes its text and background colours from your Home Assistant
+theme. Its semantic colours (the drink-window bar, the status chips, the
+health score) can be overridden per theme:
+
+```yaml
+# themes.yaml
+my_theme:
+  cellarion-not-ready-color: "#2563EB"
+  cellarion-early-color: "#0891B2"
+  cellarion-peak-color: "#059669"
+  cellarion-declining-color: "#D97706"
+  cellarion-late-color: "#DC2626"
+  cellarion-good-color: "#059669"   # health score ≥ 80, consume confirmation
+  cellarion-warn-color: "#D97706"   # health score ≥ 60, warnings
+  cellarion-bad-color: "#DC2626"    # health score < 60
+```
+
+Text in those colours is blended towards the theme's text colour, so it
+stays readable on light and dark themes alike.
 
 ### Simple Entities Card
 
