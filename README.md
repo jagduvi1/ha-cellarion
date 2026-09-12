@@ -300,10 +300,9 @@ automation:
 ## Troubleshooting
 
 **"Re-authentication required" or the sensors turn unavailable after
-working for a while.** Cellarion rejected the stored credential: the API
-token was revoked in Cellarion, or (password-based setups on older
-servers) the password changed. Open the notification and sign in again;
-nothing else needs to change.
+working for a while.** Cellarion rejected the stored token: it was revoked
+in Cellarion, or the account was deleted. Open the notification and sign
+in again; nothing else needs to change.
 
 **The setup form says the token is missing the read scope, or Repairs
 shows "Cellarion instant updates unavailable".** The token exists but
@@ -354,8 +353,6 @@ an internal address (a Docker service name, for instance), set the card's
   polling.
 - **Consume only.** The service marks bottles as consumed; adding, moving
   or rating bottles stays in Cellarion.
-- **Token revocation is manual.** Deleting the integration leaves its API
-  token valid until you revoke it in Cellarion.
 - **YAML-mode dashboards** need the card resource added by hand.
 
 ## Use cases
@@ -378,10 +375,12 @@ an internal address (a Docker service name, for instance), set the card's
 ## Removing the integration
 
 Delete the entry under **Settings → Devices & Services → Cellarion**. The
-sensors, the device and any repair issue go with it. The API token that
-was created for Home Assistant stays valid on the server until you revoke
-it in Cellarion under **Settings → API tokens** — it is named
-*Home Assistant (…)*.
+sensors, the device and any repair issue go with it, and the API token
+that was created for Home Assistant is revoked on the server at the same
+time (Cellarion 1.220 or newer). On an older server the token stays valid
+until you revoke it in Cellarion under **Settings → API tokens** — it is
+named *Home Assistant (…)*; the Home Assistant log says so when that
+happens.
 
 ## Development
 

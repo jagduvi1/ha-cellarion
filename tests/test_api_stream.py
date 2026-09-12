@@ -330,3 +330,38 @@ async def test_create_token_success_returns_string() -> None:
 async def test_health_non_json_is_unreachable() -> None:
     client, _ = token_client(FakeResponse(200, content_type="text/html"))
     assert await client.get_health() == {"status": "unreachable"}
+
+
+# ── Self-revocation ──────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize("status", [200, 401])
+async def test_revoke_own_token_done_on_200_or_401(status: int) -> None:
+    """200 = revoked now, 401 = already revoked; both mean the token is gone."""
+    client, session = token_client(FakeResponse(status, {"message": "Token revoked"}))
+    assert await client.revoke_own_token() is True
+    method, url, kwargs = session.calls[0]
+    assert (method, url) == ("DELETE", f"{BASE_URL}/api/tokens/self")
+    assert kwargs["headers"]["Authorization"] == f"Bearer {TEST_TOKEN}"
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        FakeResponse(403, {"error": "scope"}),
+        FakeResponse(404),
+        FakeResponse(500),
+        aiohttp.ClientError("down"),
+    ],
+)
+async def test_revoke_own_token_is_best_effort(response: Any) -> None:
+    """A pre-1.220 server (403), odd answers and outages mean 'maybe still valid'."""
+    client, _ = token_client(response)
+    assert await client.revoke_own_token() is False
+
+
+async def test_revoke_own_token_needs_an_api_token() -> None:
+    """A password-based client has no token of its own and sends nothing."""
+    client, session = password_client()
+    assert await client.revoke_own_token() is False
+    assert session.calls == []
