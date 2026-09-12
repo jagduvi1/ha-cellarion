@@ -14,11 +14,11 @@ quietly stays on regular polling.
 from __future__ import annotations
 
 import asyncio
+from asyncio import CancelledError
+from datetime import timedelta
 import logging
 import random
 import time
-from asyncio import CancelledError
-from datetime import timedelta
 
 from homeassistant.helpers import issue_registry as ir
 
@@ -108,8 +108,7 @@ async def async_push_listener(coordinator: CellarionCoordinator) -> None:
             except CellarionPushNotSupported:
                 if not unsupported_logged:
                     _LOGGER.info(
-                        "Cellarion server does not offer the push event "
-                        "stream; staying on polling"
+                        "Cellarion server does not offer the push event stream; staying on polling"
                     )
                     unsupported_logged = True
                 await asyncio.sleep(UNSUPPORTED_RETRY_SECONDS)
@@ -124,14 +123,13 @@ async def async_push_listener(coordinator: CellarionCoordinator) -> None:
                 _LOGGER.debug("Push stream error: %s", err)
             except CancelledError:
                 raise
-            except Exception:  # noqa: BLE001
+            except Exception:
                 # Anything the client didn't map must not end the listener
                 # for good: log it once at warning level, then keep the
                 # reconnect loop (with backoff) going.
                 _LOGGER.log(
                     logging.DEBUG if unexpected_logged else logging.WARNING,
-                    "Unexpected error in the Cellarion push stream; "
-                    "reconnecting with backoff",
+                    "Unexpected error in the Cellarion push stream; reconnecting with backoff",
                     exc_info=True,
                 )
                 unexpected_logged = True
@@ -153,7 +151,7 @@ async def async_push_listener(coordinator: CellarionCoordinator) -> None:
                 # up anything missed during the gap.
                 await coordinator.async_request_refresh()
 
-            await asyncio.sleep(backoff * (1 + random.random() * 0.25))  # noqa: S311
+            await asyncio.sleep(backoff * (1 + random.random() * 0.25))
             backoff = min(backoff * 2, RECONNECT_MAX_SECONDS)
     finally:
         coordinator.update_interval = base_interval

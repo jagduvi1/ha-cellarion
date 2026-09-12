@@ -61,7 +61,18 @@ Your wine data stays in your Cellarion account. This integration reads from the 
 
 ### Options
 
-After setup, you can adjust the polling interval (default: 30 minutes) via the integration's options.
+After setup, the integration's **Configure** button lets you change the
+polling interval. It is given in seconds, defaults to 1800 (30 minutes)
+and cannot go below 300; changing it reloads the integration. While
+instant updates are connected the interval only serves as a safety net
+(see below).
+
+### Running more than one account
+
+Add the integration once per Cellarion account. Home Assistant gives the
+second account's entities a `_2` suffix (`sensor.cellarion_total_bottles_2`
+and so on). The bundled card and the `consume_bottle` service both take an
+`entry_id` to pick the account; with a single account neither needs it.
 
 ### How updates arrive
 
@@ -127,9 +138,14 @@ your statistics, exactly like consuming it in the app.
 |-------|----------|-------------|
 | `bottle_id` | yes | The Cellarion bottle id |
 | `reason` | no | `drank` (default), `gifted`, `sold`, or `other` |
-| `rating` | no | Rating to record with the consumption |
-| `note` | no | Tasting note or comment |
+| `rating` | no | Rating to record with the consumption, 0–100 in steps of 0.5 |
+| `note` | no | Tasting note or comment, up to 1000 characters |
 | `entry_id` | no | Only when multiple Cellarion accounts are configured |
+
+The bottle id is the 24-character id Cellarion shows in a bottle's URL and
+that the card's lists carry in their `peak_bottles` / `urgent_bottles`
+attributes. Any signed-in Home Assistant user can call the service, so
+keep that in mind on shared installations.
 
 Example — log a bottle by scanning an NFC tag on its rack slot:
 
@@ -275,10 +291,58 @@ automation:
 
 ## Requirements
 
-- Home Assistant 2024.6 or newer (the bundled brand icon shows on 2026.3+)
+- Home Assistant 2025.2 or newer (the bundled brand icon shows on 2026.3+)
 - A [cellarion.app](https://cellarion.app) account (or your own self-hosted Cellarion instance)
 - Cellarion server v1.75+ unlocks instant updates, API tokens, and the
   card's consume button; older servers work with polling and password login
+
+## Troubleshooting
+
+**"Re-authentication required" or the sensors turn unavailable after
+working for a while.** Cellarion rejected the stored credential: the API
+token was revoked in Cellarion, or (password-based setups on older
+servers) the password changed. Open the notification and sign in again;
+nothing else needs to change.
+
+**The setup form says the token is missing the read scope, or Repairs
+shows "Cellarion instant updates unavailable".** The token exists but
+was created without the scope the integration needs. Create a new one in
+Cellarion under **Settings → API tokens** with both the `read` and
+`consume` scopes, then use **Reconfigure** on the integration to swap it
+in. Polling keeps working in the meantime.
+
+**"Rate limited by Cellarion" during setup.** Cellarion limits logins
+per address and locks an account after repeated failures. Wait 15
+minutes before trying again, and prefer the API-token method, which never
+logs in at all.
+
+**The card says "Cellarion entities not found".** The card looks up the
+integration's sensors in the entity registry. If the integration is set
+up and the message persists, the entities may be disabled or the card
+has an explicit `prefix` that no longer matches; clear the prefix in
+the editor's **Advanced** section.
+
+**The card looks stale after an update.** The card file is versioned, so
+a reload of the browser page picks up the new one. If a dashboard still
+shows the old card, clear the browser cache for your Home Assistant URL.
+
+**Self-hosted: instant updates never connect.** The push stream needs
+the reverse proxy to pass `/api/events/stream` through without buffering
+or compression (see the Cellarion docs on push events). Everything else
+works over polling while that is being sorted out.
+
+**The card's title link opens an address the browser can't reach.** The
+link defaults to the URL the integration was configured with. If that is
+an internal address (a Docker service name, for instance), set the card's
+`url` option to the address you use in the browser.
+
+## Removing the integration
+
+Delete the entry under **Settings → Devices & Services → Cellarion**. The
+sensors, the device and any repair issue go with it. The API token that
+was created for Home Assistant stays valid on the server until you revoke
+it in Cellarion under **Settings → API tokens** — it is named
+*Home Assistant (…)*.
 
 ## Development
 
@@ -293,6 +357,15 @@ Open http://localhost:8123, create a user, and add the Cellarion integration.
 The container joins the local Cellarion compose network, so use
 `http://cellarion-backend:5000` as the instance URL. After changing the
 integration code, run `docker compose restart homeassistant`.
+
+To run the checks CI runs:
+
+```bash
+pip install -r requirements_test.txt
+pytest tests                       # integration tests
+node --test tests/                 # bundled card tests
+ruff check . && mypy custom_components/cellarion
+```
 
 ## License
 

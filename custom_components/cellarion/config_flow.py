@@ -7,8 +7,6 @@ import logging
 from typing import Any
 from urllib.parse import urlparse
 
-import voluptuous as vol
-
 from homeassistant.config_entries import (
     SOURCE_REAUTH,
     SOURCE_RECONFIGURE,
@@ -19,6 +17,8 @@ from homeassistant.config_entries import (
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.helpers.typing import UNDEFINED
+import voluptuous as vol
 
 from .api import (
     CellarionApiClient,
@@ -88,9 +88,7 @@ async def _validate_token(
     account_id is the identity to verify against on reauth (None when the
     server/token can't provide one).
     """
-    client = CellarionApiClient(
-        async_get_clientsession(hass), url, token=token
-    )
+    client = CellarionApiClient(async_get_clientsession(hass), url, token=token)
     try:
         await client.get_stats_overview()
     except CellarionScopeError:
@@ -100,15 +98,13 @@ async def _validate_token(
     except CellarionApiError as err:
         _LOGGER.error("Cannot connect to Cellarion at %s: %s", url, err)
         return "cannot_connect", None
-    except Exception:  # noqa: BLE001
+    except Exception:
         _LOGGER.exception("Unexpected error validating Cellarion token")
         return "unknown", None
     return None, await client.get_account_id()
 
 
-def _account_mismatch(
-    entry: ConfigEntry | None, new_account_id: str | None
-) -> bool:
+def _account_mismatch(entry: ConfigEntry | None, new_account_id: str | None) -> bool:
     """True only when the new credential provably belongs to a different account.
 
     Requires both a previously stored account id and a freshly fetched one —
@@ -142,17 +138,11 @@ class CellarionConfigFlow(ConfigFlow, domain=DOMAIN):
 
     # ── Entry points ─────────────────────────────────────────────────
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Choose the authentication method."""
-        return self.async_show_menu(
-            step_id="user", menu_options=["token", "password"]
-        )
+        return self.async_show_menu(step_id="user", menu_options=["token", "password"])
 
-    async def async_step_reauth(
-        self, entry_data: dict[str, Any]
-    ) -> ConfigFlowResult:
+    async def async_step_reauth(self, entry_data: dict[str, Any]) -> ConfigFlowResult:
         """Handle reauth when credentials stop working."""
         return await self.async_step_reauth_confirm()
 
@@ -164,23 +154,17 @@ class CellarionConfigFlow(ConfigFlow, domain=DOMAIN):
         The menu's step_id must map to this handler — HA resumes menu
         flows by re-invoking async_step_<step_id>.
         """
-        return self.async_show_menu(
-            step_id="reauth_confirm", menu_options=["token", "password"]
-        )
+        return self.async_show_menu(step_id="reauth_confirm", menu_options=["token", "password"])
 
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Reconfigure the entry (change URL or credentials)."""
-        return self.async_show_menu(
-            step_id="reconfigure", menu_options=["token", "password"]
-        )
+        return self.async_show_menu(step_id="reconfigure", menu_options=["token", "password"])
 
     # ── API token path ───────────────────────────────────────────────
 
-    async def async_step_token(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_token(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Authenticate with a pasted personal API token."""
         errors: dict[str, str] = {}
         entry = self._entry
@@ -212,8 +196,7 @@ class CellarionConfigFlow(ConfigFlow, domain=DOMAIN):
                             CONF_URL: url,
                             CONF_EMAIL: entry.data.get(CONF_EMAIL),
                             CONF_TOKEN: token,
-                            CONF_ACCOUNT_ID: account_id
-                            or entry.data.get(CONF_ACCOUNT_ID),
+                            CONF_ACCOUNT_ID: account_id or entry.data.get(CONF_ACCOUNT_ID),
                         },
                         unique_id=unique_id if account_id else None,
                         title=_host_title(url) if not entry.data.get(CONF_EMAIL) else None,
@@ -240,9 +223,7 @@ class CellarionConfigFlow(ConfigFlow, domain=DOMAIN):
                     vol.Required(CONF_TOKEN): str,
                 }
             )
-        return self.async_show_form(
-            step_id="token", data_schema=schema, errors=errors
-        )
+        return self.async_show_form(step_id="token", data_schema=schema, errors=errors)
 
     # ── Email & password path (mints a token when supported) ────────
 
@@ -278,13 +259,9 @@ class CellarionConfigFlow(ConfigFlow, domain=DOMAIN):
                     account_id = await client.get_account_id()
                     try:
                         name = f"Home Assistant ({self.hass.config.location_name})"
-                        token = await client.async_create_api_token(
-                            name[:60], TOKEN_SCOPES
-                        )
+                        token = await client.async_create_api_token(name[:60], TOKEN_SCOPES)
                         data = {CONF_URL: url, CONF_EMAIL: email, CONF_TOKEN: token}
-                        _LOGGER.debug(
-                            "Minted a scoped API token; password not stored"
-                        )
+                        _LOGGER.debug("Minted a scoped API token; password not stored")
                     except CellarionTokensNotSupported:
                         # Older self-hosted server — fall back to password auth
                         data = {
@@ -293,19 +270,15 @@ class CellarionConfigFlow(ConfigFlow, domain=DOMAIN):
                             CONF_PASSWORD: password,
                         }
                     # Keep any previously stored id if the server can't supply one
-                    resolved = account_id or (
-                        entry.data.get(CONF_ACCOUNT_ID) if entry else None
-                    )
+                    resolved = account_id or (entry.data.get(CONF_ACCOUNT_ID) if entry else None)
                     if resolved:
                         data[CONF_ACCOUNT_ID] = resolved
                 except CellarionAuthError:
                     errors["base"] = "invalid_auth"
                 except CellarionApiError as err:
-                    _LOGGER.error(
-                        "Cannot connect to Cellarion at %s: %s", url, err
-                    )
+                    _LOGGER.error("Cannot connect to Cellarion at %s: %s", url, err)
                     errors["base"] = "cannot_connect"
-                except Exception:  # noqa: BLE001
+                except Exception:
                     _LOGGER.exception("Unexpected error during setup")
                     errors["base"] = "unknown"
 
@@ -332,9 +305,7 @@ class CellarionConfigFlow(ConfigFlow, domain=DOMAIN):
         if entry and self._is_reauth:
             schema = vol.Schema(
                 {
-                    vol.Required(
-                        CONF_EMAIL, default=entry.data.get(CONF_EMAIL, "")
-                    ): str,
+                    vol.Required(CONF_EMAIL, default=entry.data.get(CONF_EMAIL, "")): str,
                     vol.Required(CONF_PASSWORD): str,
                 }
             )
@@ -350,9 +321,7 @@ class CellarionConfigFlow(ConfigFlow, domain=DOMAIN):
                     vol.Required(CONF_PASSWORD): str,
                 }
             )
-        return self.async_show_form(
-            step_id="password", data_schema=schema, errors=errors
-        )
+        return self.async_show_form(step_id="password", data_schema=schema, errors=errors)
 
     # ── Helpers ──────────────────────────────────────────────────────
 
@@ -371,16 +340,14 @@ class CellarionConfigFlow(ConfigFlow, domain=DOMAIN):
         another entry; the entry's own id is of course allowed.
         """
         if unique_id and unique_id != entry.unique_id:
-            other = self.hass.config_entries.async_entry_for_domain_unique_id(
-                DOMAIN, unique_id
-            )
+            other = self.hass.config_entries.async_entry_for_domain_unique_id(DOMAIN, unique_id)
             if other and other.entry_id != entry.entry_id:
                 return self.async_abort(reason="already_configured")
         return self.async_update_reload_and_abort(
             entry,
             data={k: v for k, v in data.items() if v is not None},
-            **({"unique_id": unique_id} if unique_id else {}),
-            **({"title": title} if title else {}),
+            unique_id=unique_id or UNDEFINED,
+            title=title or UNDEFINED,
         )
 
     @staticmethod
@@ -393,9 +360,7 @@ class CellarionConfigFlow(ConfigFlow, domain=DOMAIN):
 class CellarionOptionsFlow(OptionsFlow):
     """Handle options for Cellarion."""
 
-    async def async_step_init(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         """Manage the options."""
         if user_input is not None:
             return self.async_create_entry(title="", data=user_input)
@@ -409,9 +374,7 @@ class CellarionOptionsFlow(OptionsFlow):
                         default=self.config_entry.options.get(
                             CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
                         ),
-                    ): vol.All(
-                        vol.Coerce(int), vol.Range(min=MIN_SCAN_INTERVAL)
-                    ),
+                    ): vol.All(vol.Coerce(int), vol.Range(min=MIN_SCAN_INTERVAL)),
                 }
             ),
         )

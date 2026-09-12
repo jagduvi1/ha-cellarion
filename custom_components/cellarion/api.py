@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import logging
 from collections.abc import AsyncIterator
+import logging
 from typing import Any
 from urllib.parse import quote
 
@@ -96,8 +96,7 @@ class CellarionApiClient:
 
         if 300 <= resp.status < 400:
             raise CellarionApiError(
-                f"Login was redirected (status {resp.status}); "
-                "configure the final instance URL"
+                f"Login was redirected (status {resp.status}); configure the final instance URL"
             )
         if resp.status in (400, 401):
             raise CellarionAuthError("Invalid email or password")
@@ -114,9 +113,7 @@ class CellarionApiClient:
             raise CellarionApiError("No token in login response")
         return True
 
-    async def _send(
-        self, method: str, path: str, json: JsonDict | None
-    ) -> aiohttp.ClientResponse:
+    async def _send(self, method: str, path: str, json: JsonDict | None) -> aiohttp.ClientResponse:
         """Issue one request, mapping transport errors to CellarionApiError."""
         try:
             return await self._session.request(
@@ -129,9 +126,7 @@ class CellarionApiClient:
         except (aiohttp.ClientError, TimeoutError) as err:
             raise CellarionApiError(f"Request failed: {err}") from err
 
-    async def _request(
-        self, method: str, path: str, json: JsonDict | None = None
-    ) -> JsonDict:
+    async def _request(self, method: str, path: str, json: JsonDict | None = None) -> JsonDict:
         """Make an authenticated API request with auto-retry on 401."""
         if not self._token:
             await self.authenticate()
@@ -146,15 +141,11 @@ class CellarionApiClient:
                 await self.authenticate()
                 resp = await self._send(method, path, json)
                 if resp.status == 401:
-                    raise CellarionAuthError(
-                        "Authentication rejected after retry"
-                    )
+                    raise CellarionAuthError("Authentication rejected after retry")
 
             if resp.status == 403 and self._api_token:
                 # Valid token, missing scope — a config error; re-login won't help
-                raise CellarionScopeError(
-                    f"API token lacks the scope for {method} {path}"
-                )
+                raise CellarionScopeError(f"API token lacks the scope for {method} {path}")
 
             # Accept the 2xx success range: action endpoints (e.g. consume) may
             # answer 201/204 rather than 200.
@@ -246,17 +237,13 @@ class CellarionApiClient:
                 "configure the final instance URL"
             )
         if resp.status in (404, 405, 501):
-            raise CellarionTokensNotSupported(
-                "Server does not support API tokens"
-            )
+            raise CellarionTokensNotSupported("Server does not support API tokens")
         if resp.status in (401, 403):
             raise CellarionAuthError("Password confirmation rejected")
         if resp.status == 429:
             raise CellarionApiError("Rate limited by Cellarion, try again later")
         if resp.status not in (200, 201):
-            raise CellarionApiError(
-                f"Token creation returned status {resp.status}"
-            )
+            raise CellarionApiError(f"Token creation returned status {resp.status}")
 
         data = await _read_json(resp, "Token creation")
         token = data.get("token")
@@ -266,9 +253,7 @@ class CellarionApiClient:
 
     async def get_peak_bottles(self, limit: int = 10) -> JsonDict:
         """Fetch bottles currently in their peak drink window."""
-        return await self._request(
-            "GET", f"/api/bottles?maturity=peak&limit={int(limit)}"
-        )
+        return await self._request("GET", f"/api/bottles?maturity=peak&limit={int(limit)}")
 
     async def consume_bottle(
         self,
@@ -318,9 +303,7 @@ class CellarionApiClient:
             await self.authenticate()
             headers["Authorization"] = f"Bearer {self._token}"
             try:
-                resp = await self._session.get(
-                    url, headers=headers, timeout=timeout
-                )
+                resp = await self._session.get(url, headers=headers, timeout=timeout)
             except (aiohttp.ClientError, TimeoutError) as err:
                 raise CellarionApiError(f"Push stream retry failed: {err}") from err
             if resp.status == 401:
@@ -331,9 +314,7 @@ class CellarionApiClient:
             # API token without the 'read' scope — a configuration error the
             # user must fix; retrying or falling back silently would hide it
             resp.close()
-            raise CellarionPushForbidden(
-                "Credential lacks the 'read' scope for the event stream"
-            )
+            raise CellarionPushForbidden("Credential lacks the 'read' scope for the event stream")
         if resp.status in (404, 405, 501):
             resp.close()
             raise CellarionPushNotSupported("Server has no /api/events/stream")
@@ -344,9 +325,7 @@ class CellarionApiClient:
         if not resp.content_type.startswith("text/event-stream"):
             # A proxy or SPA fallback answered instead of the stream route
             resp.close()
-            raise CellarionPushNotSupported(
-                f"Expected text/event-stream, got {resp.content_type}"
-            )
+            raise CellarionPushNotSupported(f"Expected text/event-stream, got {resp.content_type}")
 
         try:
             yield "_connected"

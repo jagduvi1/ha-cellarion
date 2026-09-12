@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import pytest
-
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+import pytest
 
 from custom_components.cellarion.api import (
     CellarionApiClient,
@@ -18,14 +17,10 @@ from custom_components.cellarion.api import (
 from .conftest import BASE_URL, JWT, TEST_TOKEN
 
 
-async def test_login_sends_username_field(
-    hass: HomeAssistant, aioclient_mock
-) -> None:
+async def test_login_sends_username_field(hass: HomeAssistant, aioclient_mock) -> None:
     """The login payload uses 'username' (the field the API expects)."""
     aioclient_mock.post(f"{BASE_URL}/api/auth/login", json={"token": JWT})
-    client = CellarionApiClient(
-        async_get_clientsession(hass), BASE_URL, "user@example.com", "pw"
-    )
+    client = CellarionApiClient(async_get_clientsession(hass), BASE_URL, "user@example.com", "pw")
     assert await client.authenticate()
     assert aioclient_mock.mock_calls[0][2] == {
         "username": "user@example.com",
@@ -33,30 +28,18 @@ async def test_login_sends_username_field(
     }
 
 
-async def test_invalid_login_raises_auth_error(
-    hass: HomeAssistant, aioclient_mock
-) -> None:
+async def test_invalid_login_raises_auth_error(hass: HomeAssistant, aioclient_mock) -> None:
     """400/401 logins raise CellarionAuthError."""
-    aioclient_mock.post(
-        f"{BASE_URL}/api/auth/login", status=401, json={"error": "no"}
-    )
-    client = CellarionApiClient(
-        async_get_clientsession(hass), BASE_URL, "user@example.com", "bad"
-    )
+    aioclient_mock.post(f"{BASE_URL}/api/auth/login", status=401, json={"error": "no"})
+    client = CellarionApiClient(async_get_clientsession(hass), BASE_URL, "user@example.com", "bad")
     with pytest.raises(CellarionAuthError):
         await client.authenticate()
 
 
-async def test_static_token_never_relogs(
-    hass: HomeAssistant, aioclient_mock
-) -> None:
+async def test_static_token_never_relogs(hass: HomeAssistant, aioclient_mock) -> None:
     """A 401 with an API token raises immediately (revoked token)."""
-    aioclient_mock.get(
-        f"{BASE_URL}/api/stats/overview", status=401, json={"error": "no"}
-    )
-    client = CellarionApiClient(
-        async_get_clientsession(hass), BASE_URL, token=TEST_TOKEN
-    )
+    aioclient_mock.get(f"{BASE_URL}/api/stats/overview", status=401, json={"error": "no"})
+    client = CellarionApiClient(async_get_clientsession(hass), BASE_URL, token=TEST_TOKEN)
     with pytest.raises(CellarionAuthError):
         await client.get_stats_overview()
     # Exactly one request — no login retry loop
@@ -65,108 +48,70 @@ async def test_static_token_never_relogs(
 
 async def test_token_scope_error(hass: HomeAssistant, aioclient_mock) -> None:
     """A 403 with an API token raises CellarionScopeError."""
-    aioclient_mock.get(
-        f"{BASE_URL}/api/stats/overview", status=403, json={"error": "scope"}
-    )
-    client = CellarionApiClient(
-        async_get_clientsession(hass), BASE_URL, token=TEST_TOKEN
-    )
+    aioclient_mock.get(f"{BASE_URL}/api/stats/overview", status=403, json={"error": "scope"})
+    client = CellarionApiClient(async_get_clientsession(hass), BASE_URL, token=TEST_TOKEN)
     with pytest.raises(CellarionScopeError):
         await client.get_stats_overview()
 
 
-async def test_get_account_id_reads_whoami(
-    hass: HomeAssistant, aioclient_mock
-) -> None:
+async def test_get_account_id_reads_whoami(hass: HomeAssistant, aioclient_mock) -> None:
     """The account id is read from the whoami identity endpoint."""
     aioclient_mock.get(f"{BASE_URL}/api/auth/whoami", json={"id": "ACC-1"})
-    client = CellarionApiClient(
-        async_get_clientsession(hass), BASE_URL, token=TEST_TOKEN
-    )
+    client = CellarionApiClient(async_get_clientsession(hass), BASE_URL, token=TEST_TOKEN)
     assert await client.get_account_id() == "ACC-1"
 
 
-async def test_get_account_id_none_when_scope_denied(
-    hass: HomeAssistant, aioclient_mock
-) -> None:
+async def test_get_account_id_none_when_scope_denied(hass: HomeAssistant, aioclient_mock) -> None:
     """A 403 (token can't reach whoami yet) yields None, not an error."""
-    aioclient_mock.get(
-        f"{BASE_URL}/api/auth/whoami", status=403, json={"error": "scope"}
-    )
-    client = CellarionApiClient(
-        async_get_clientsession(hass), BASE_URL, token=TEST_TOKEN
-    )
+    aioclient_mock.get(f"{BASE_URL}/api/auth/whoami", status=403, json={"error": "scope"})
+    client = CellarionApiClient(async_get_clientsession(hass), BASE_URL, token=TEST_TOKEN)
     assert await client.get_account_id() is None
 
 
-async def test_get_account_id_none_on_non_dict_body(
-    hass: HomeAssistant, aioclient_mock
-) -> None:
+async def test_get_account_id_none_on_non_dict_body(hass: HomeAssistant, aioclient_mock) -> None:
     """A valid-JSON but non-object 200 body must not raise — returns None."""
     aioclient_mock.get(f"{BASE_URL}/api/auth/whoami", json=[])
-    client = CellarionApiClient(
-        async_get_clientsession(hass), BASE_URL, token=TEST_TOKEN
-    )
+    client = CellarionApiClient(async_get_clientsession(hass), BASE_URL, token=TEST_TOKEN)
     assert await client.get_account_id() is None
 
 
-async def test_create_token_not_supported(
-    hass: HomeAssistant, aioclient_mock
-) -> None:
+async def test_create_token_not_supported(hass: HomeAssistant, aioclient_mock) -> None:
     """404 on /api/tokens raises CellarionTokensNotSupported."""
     aioclient_mock.post(f"{BASE_URL}/api/auth/login", json={"token": JWT})
-    aioclient_mock.post(
-        f"{BASE_URL}/api/tokens", status=404, json={"error": "nope"}
-    )
-    client = CellarionApiClient(
-        async_get_clientsession(hass), BASE_URL, "user@example.com", "pw"
-    )
+    aioclient_mock.post(f"{BASE_URL}/api/tokens", status=404, json={"error": "nope"})
+    client = CellarionApiClient(async_get_clientsession(hass), BASE_URL, "user@example.com", "pw")
     with pytest.raises(CellarionTokensNotSupported):
         await client.async_create_api_token("HA", ["read"])
 
 
-async def test_login_does_not_follow_redirects(
-    hass: HomeAssistant, aioclient_mock
-) -> None:
+async def test_login_does_not_follow_redirects(hass: HomeAssistant, aioclient_mock) -> None:
     """A redirected login is an error, never a re-post of the password."""
     aioclient_mock.post(
         f"{BASE_URL}/api/auth/login",
         status=307,
         headers={"Location": "https://elsewhere.example/login"},
     )
-    client = CellarionApiClient(
-        async_get_clientsession(hass), BASE_URL, "user@example.com", "pw"
-    )
+    client = CellarionApiClient(async_get_clientsession(hass), BASE_URL, "user@example.com", "pw")
     with pytest.raises(CellarionApiError, match="redirected"):
         await client.authenticate()
     assert len(aioclient_mock.mock_calls) == 1
 
 
-async def test_login_non_json_body_is_api_error(
-    hass: HomeAssistant, aioclient_mock
-) -> None:
+async def test_login_non_json_body_is_api_error(hass: HomeAssistant, aioclient_mock) -> None:
     """A proxy answering 200 with HTML maps to a normal API error."""
     aioclient_mock.post(
         f"{BASE_URL}/api/auth/login",
         text="<html>login page</html>",
         headers={"Content-Type": "text/html"},
     )
-    client = CellarionApiClient(
-        async_get_clientsession(hass), BASE_URL, "user@example.com", "pw"
-    )
+    client = CellarionApiClient(async_get_clientsession(hass), BASE_URL, "user@example.com", "pw")
     with pytest.raises(CellarionApiError, match="not JSON"):
         await client.authenticate()
 
 
 async def test_consume_quotes_bottle_id(hass: HomeAssistant, aioclient_mock) -> None:
     """Path characters in a bottle id are escaped, not interpreted."""
-    aioclient_mock.post(
-        f"{BASE_URL}/api/bottles/abc%2F..%2Fx/consume", json={"ok": True}
-    )
-    client = CellarionApiClient(
-        async_get_clientsession(hass), BASE_URL, token=TEST_TOKEN
-    )
+    aioclient_mock.post(f"{BASE_URL}/api/bottles/abc%2F..%2Fx/consume", json={"ok": True})
+    client = CellarionApiClient(async_get_clientsession(hass), BASE_URL, token=TEST_TOKEN)
     await client.consume_bottle("abc/../x")
-    assert str(aioclient_mock.mock_calls[0][1]).endswith(
-        "/api/bottles/abc%2F..%2Fx/consume"
-    )
+    assert str(aioclient_mock.mock_calls[0][1]).endswith("/api/bottles/abc%2F..%2Fx/consume")
