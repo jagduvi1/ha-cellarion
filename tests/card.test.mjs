@@ -121,6 +121,8 @@ globalThis.document = {
   },
 };
 globalThis.window = globalThis;
+globalThis.customElements.get = () => undefined;
+const tick = () => new Promise((r) => setTimeout(r, 0));
 
 await import("../custom_components/cellarion/www/cellarion-card.js");
 
@@ -527,7 +529,9 @@ test("the consume button calls the service once, with entry_id, and locks itself
   card.hass = hass;
   const [btn] = card.shadowRoot.querySelectorAll("button.consume");
   btn.fire("click");
+  await tick();
   btn.fire("click"); // double tap while in flight
+  await tick();
   assert.equal(calls.length, 1);
   assert.deepEqual(calls[0], ["cellarion", "consume_bottle", { bottle_id: "b1", entry_id: "entry-a" }]);
   assert.equal(btn.disabled, true);
@@ -547,12 +551,13 @@ test("a failed consume call unlocks the button again", async () => {
   card.hass = hass;
   const [btn] = card.shadowRoot.querySelectorAll("button.consume");
   btn.fire("click");
-  await new Promise((r) => setTimeout(r, 0));
+  await tick();
+  await tick();
   assert.equal(btn.disabled, false);
   assert.equal(btn.getAttribute("aria-busy"), null);
 });
 
-test("declining the confirmation sends nothing", () => {
+test("declining the confirmation sends nothing", async () => {
   const calls = [];
   const hass = fakeHass();
   hass.callService = (...args) => { calls.push(args); };
@@ -561,7 +566,51 @@ test("declining the confirmation sends nothing", () => {
   card.setConfig({});
   card.hass = hass;
   card.shadowRoot.querySelectorAll("button.consume")[0].fire("click");
+  await tick();
   assert.equal(calls.length, 0);
+});
+
+test("the HA confirmation dialog is used when the frontend has it", async () => {
+  const calls = [];
+  const hass = fakeHass();
+  hass.callService = (...args) => { calls.push(args); return Promise.resolve(); };
+  globalThis.confirm = () => { throw new Error("native confirm must not be used"); };
+  globalThis.customElements.get = (tag) => (tag === "dialog-box" ? class {} : undefined);
+  try {
+    const card = new CellarionCard();
+    card.setConfig({});
+    card.hass = hass;
+    card.shadowRoot.querySelectorAll("button.consume")[0].fire("click");
+    await tick();
+    const dlg = card.dispatched.find((e) => e.type === "show-dialog");
+    assert.ok(dlg, "show-dialog was fired");
+    assert.equal(dlg.detail.dialogTag, "dialog-box");
+    assert.equal(dlg.detail.dialogParams.confirmation, true);
+    dlg.detail.dialogParams.cancel();
+    await tick();
+    assert.equal(calls.length, 0, "cancel sends nothing");
+    card.shadowRoot.querySelectorAll("button.consume")[0].fire("click");
+    await tick();
+    card.dispatched.filter((e) => e.type === "show-dialog").at(-1).detail.dialogParams.confirm();
+    await tick();
+    assert.equal(calls.length, 1);
+  } finally {
+    globalThis.customElements.get = () => undefined;
+  }
+});
+
+test("sections dashboards get a grid hint", () => {
+  assert.deepEqual(new CellarionCard().getGridOptions(), { columns: 12, min_columns: 6, rows: "auto" });
+});
+
+test("the drink-soon 'more' count never undercounts the list", () => {
+  const many = Array.from({ length: 8 }, (_, i) => ({ id: "u" + i, name: "Wine " + i, vintage: 2000 + i, status: "declining" }));
+  const hass = fakeHass({
+    "sensor.cellarion_bottles_declining": state(2, { urgent_bottles: many }),
+    "sensor.cellarion_bottles_late_window": state(0),
+  });
+  const html = render({}, hass);
+  assert.match(html, /\+ 3 more/);
 });
 
 test("keyboard focus survives a re-render", () => {

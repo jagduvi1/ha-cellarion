@@ -156,6 +156,11 @@ class CellarionCard extends HTMLElement {
     }
   }
 
+  // Sections dashboards: a comfortable default width, content-sized height.
+  getGridOptions() {
+    return { columns: 12, min_columns: 6, rows: "auto" };
+  }
+
   getCardSize() {
     // Rough row count for the masonry layout: start from the full card and
     // give back the rows the hidden pieces would have taken.
@@ -228,6 +233,34 @@ class CellarionCard extends HTMLElement {
     } catch (e) {
       return String(n);
     }
+  }
+
+  // Home Assistant's own confirmation dialog when the frontend has it
+  // loaded (it is, once any confirmation has been shown), otherwise the
+  // browser's — some kiosk webviews block the native one, so the HA dialog
+  // is preferred whenever it can be used.
+  _confirm(text) {
+    if (!customElements.get("dialog-box")) {
+      return Promise.resolve(window.confirm(text));
+    }
+    return new Promise((resolve) => {
+      this.dispatchEvent(new CustomEvent("show-dialog", {
+        bubbles: true, composed: true,
+        detail: {
+          dialogTag: "dialog-box",
+          dialogImport: () => customElements.whenDefined("dialog-box"),
+          dialogParams: {
+            title: "Mark as drunk?",
+            text,
+            confirmText: "Mark as drunk",
+            dismissText: "Cancel",
+            confirmation: true,
+            confirm: () => resolve(true),
+            cancel: () => resolve(false),
+          },
+        },
+      }));
+    });
   }
 
   _moreInfo(entityId) {
@@ -306,8 +339,14 @@ class CellarionCard extends HTMLElement {
     // Only ever open an http(s) target — never a javascript:/data: URL that
     // could arrive via card config or a spoofed instance_url attribute.
     const link = /^https?:\/\//i.test(rawLink || "") ? rawLink : null;
-    const urgentTotal = (this._num("_bottles_declining") ?? 0)
-      + (this._num("_bottles_late_window") ?? 0);
+    // The list comes from the server's urgency ladder (up to ten bottles in
+    // the attribute); the sensors say how many declining/late bottles exist
+    // in total. Whichever is larger is the honest "more" count.
+    const urgentAll = this._state("_bottles_declining")?.attributes?.urgent_bottles || [];
+    const urgentTotal = Math.max(
+      urgentAll.length,
+      (this._num("_bottles_declining") ?? 0) + (this._num("_bottles_late_window") ?? 0),
+    );
     const moreLine = (total, shown) => total > shown ? (link
       ? `<a class="more" href="${esc(link)}" target="_blank" rel="noopener">+ ${total - shown} more in Cellarion</a>`
       : `<div class="more">+ ${total - shown} more</div>`) : "";
@@ -496,10 +535,11 @@ class CellarionCard extends HTMLElement {
       });
     });
     this.shadowRoot.querySelectorAll("button.consume").forEach((el) => {
-      el.addEventListener("click", (ev) => {
+      el.addEventListener("click", async (ev) => {
         ev.stopPropagation();
         if (el.disabled) return;
-        if (!window.confirm(`Mark "${el.dataset.name}" as drunk?`)) return;
+        if (!(await this._confirm(`Mark "${el.dataset.name}" as drunk?`))) return;
+        if (el.disabled) return; // a second tap raced the dialog
         const data = { bottle_id: el.dataset.bottle };
         // Needed when more than one Cellarion account is configured;
         // harmless (ignored) for a single account.

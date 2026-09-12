@@ -33,7 +33,7 @@
           "token": "API token"
         },
         "data_description": {
-          "url": "The address of your Cellarion instance: the hosted service, or your own server when self-hosting.",
+          "url": "The address of your Cellarion instance: the hosted service, or your own server when self-hosting. Use https unless the server is on your own network — over plain http the token travels unencrypted.",
           "token": "A personal API token from Cellarion → Settings → API tokens, created with the read and consume scopes."
         }
       },
@@ -46,7 +46,7 @@
           "password": "Password"
         },
         "data_description": {
-          "url": "The address of your Cellarion instance: the hosted service, or your own server when self-hosting.",
+          "url": "The address of your Cellarion instance: the hosted service, or your own server when self-hosting. Use https unless the server is on your own network — over plain http the token travels unencrypted.",
           "email": "The email address or username of your Cellarion account.",
           "password": "Used once to create a scoped API token; never stored."
         }
