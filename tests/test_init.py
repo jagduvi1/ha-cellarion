@@ -11,7 +11,7 @@ from homeassistant.helpers import issue_registry as ir
 from custom_components.cellarion.const import DOMAIN
 from custom_components.cellarion.push import PUSH_FORBIDDEN_ISSUE, push_issue_id
 
-from .conftest import BASE_URL, STATS_PAYLOAD, mock_cellarion_api
+from .conftest import BASE_URL, STATS_PAYLOAD, TEST_TOKEN, mock_cellarion_api
 
 
 async def test_setup_token_entry(hass: HomeAssistant, aioclient_mock, token_entry) -> None:
@@ -312,3 +312,40 @@ async def test_card_registration_failure_is_only_a_warning(
     await hass.async_block_till_done()
     assert token_entry.state is ConfigEntryState.LOADED
     assert "Could not register the Cellarion card automatically" in caplog.text
+
+
+async def test_remove_entry_revokes_its_token(
+    hass: HomeAssistant, aioclient_mock, token_entry, caplog
+) -> None:
+    """Deleting the integration asks the server to revoke the entry's token."""
+    token_entry.add_to_hass(hass)
+    mock_cellarion_api(aioclient_mock)
+    aioclient_mock.delete(f"{BASE_URL}/api/tokens/self", json={"message": "Token revoked"})
+    assert await hass.config_entries.async_setup(token_entry.entry_id)
+    await hass.async_block_till_done()
+
+    await hass.config_entries.async_remove(token_entry.entry_id)
+    await hass.async_block_till_done()
+
+    revokes = [c for c in aioclient_mock.mock_calls if c[0] == "DELETE"]
+    assert len(revokes) == 1
+    assert str(revokes[0][1]).endswith("/api/tokens/self")
+    assert revokes[0][3]["Authorization"] == f"Bearer {TEST_TOKEN}"
+    assert "Revoked the Cellarion API token" in caplog.text
+
+
+async def test_remove_entry_survives_an_old_server(
+    hass: HomeAssistant, aioclient_mock, token_entry, caplog
+) -> None:
+    """A server without the self-revoke route only earns a warning."""
+    token_entry.add_to_hass(hass)
+    mock_cellarion_api(aioclient_mock)
+    aioclient_mock.delete(f"{BASE_URL}/api/tokens/self", status=403, json={"error": "scope"})
+    assert await hass.config_entries.async_setup(token_entry.entry_id)
+    await hass.async_block_till_done()
+
+    await hass.config_entries.async_remove(token_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert not hass.config_entries.async_entries(DOMAIN)
+    assert "could not be revoked automatically" in caplog.text

@@ -248,9 +248,21 @@ async def async_unload_entry(hass: HomeAssistant, entry: CellarionConfigEntry) -
 async def async_remove_entry(hass: HomeAssistant, entry: CellarionConfigEntry) -> None:
     """Clean up when the entry is deleted for good.
 
-    The scoped API token minted for this entry stays valid on the server:
-    revoking it currently needs a password-confirmed session the integration
-    doesn't have, so the README tells users where to revoke it. Once Cellarion
-    lets a token revoke itself, that call belongs here.
+    The scoped API token minted for this entry is revoked on the server
+    (DELETE /api/tokens/self, Cellarion 1.220+). Older servers answer 403 and
+    the token has to be revoked by hand, as the README explains; removal
+    itself never fails because of it.
     """
     ir.async_delete_issue(hass, DOMAIN, push_issue_id(entry.entry_id))
+    if not (token := entry.data.get(CONF_TOKEN)):
+        return
+    client = CellarionApiClient(
+        session=async_get_clientsession(hass), url=entry.data[CONF_URL], token=token
+    )
+    if await client.revoke_own_token():
+        _LOGGER.info("Revoked the Cellarion API token that belonged to this entry")
+    else:
+        _LOGGER.warning(
+            "The Cellarion API token for this entry could not be revoked automatically; "
+            "revoke it in Cellarion under Settings → API tokens if it is still listed"
+        )

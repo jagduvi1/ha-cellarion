@@ -352,6 +352,32 @@ class CellarionApiClient:
         finally:
             resp.close()
 
+    async def revoke_own_token(self) -> bool:
+        """Ask the server to revoke the API token this client authenticates with.
+
+        Best effort, never raises: this runs while the integration is being
+        deleted, and nothing the user can do at that point would change the
+        outcome. Returns True when the token is gone — a 200 (revoked now) or
+        a 401 (already revoked or invalid). Anything else means it may still
+        be valid: a 403 from a server older than Cellarion 1.220 that has no
+        self-revoke route, or an outage. Password-based clients have no token
+        of their own and return False.
+        """
+        if not self._api_token:
+            return False
+        try:
+            resp = await self._send("DELETE", "/api/tokens/self", None)
+        except CellarionApiError as err:
+            _LOGGER.debug("Token self-revocation failed: %s", err)
+            return False
+        try:
+            if resp.status in (200, 401):
+                return True
+            _LOGGER.debug("Token self-revocation answered %s", resp.status)
+            return False
+        finally:
+            resp.close()
+
     async def get_health(self) -> JsonDict:
         """Fetch service health (no auth required, but we use it anyway)."""
         try:
