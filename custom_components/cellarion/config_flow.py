@@ -39,6 +39,7 @@ from .const import (
     MIN_SCAN_INTERVAL,
     TOKEN_SCOPES,
 )
+from .coordinator import CellarionConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -351,7 +352,7 @@ class CellarionConfigFlow(ConfigFlow, domain=DOMAIN):
 
     @staticmethod
     @callback
-    def async_get_options_flow(config_entry: ConfigEntry) -> CellarionOptionsFlow:
+    def async_get_options_flow(config_entry: CellarionConfigEntry) -> CellarionOptionsFlow:
         """Return the options flow handler."""
         return CellarionOptionsFlow()
 

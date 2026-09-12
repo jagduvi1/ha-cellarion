@@ -15,6 +15,7 @@ class CellarionEntity(CoordinatorEntity[CellarionCoordinator]):
     _attr_has_entity_name = True
 
     def __init__(self, coordinator: CellarionCoordinator, entry_id: str) -> None:
+        """Attach the entity to the account's service device."""
         super().__init__(coordinator)
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry_id)},

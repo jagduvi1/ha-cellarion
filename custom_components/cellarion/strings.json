@@ -134,6 +134,9 @@
         "title": "Cellarion Options",
         "data": {
           "scan_interval": "Update interval (seconds)"
+        },
+        "data_description": {
+          "scan_interval": "Seconds between polls of Cellarion. At least 300; while instant updates are connected this only serves as a safety net."
         }
       }
     }

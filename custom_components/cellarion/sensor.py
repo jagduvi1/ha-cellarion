@@ -268,6 +268,7 @@ class CellarionSensor(CellarionEntity, SensorEntity):
         description: CellarionSensorDescription,
         entry_id: str,
     ) -> None:
+        """Initialize the sensor from its description."""
         super().__init__(coordinator, entry_id)
         self.entity_description = description
         self._attr_unique_id = f"{entry_id}_{description.key}"

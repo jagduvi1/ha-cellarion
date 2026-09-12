@@ -9,8 +9,11 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import issue_registry as ir
 
 from custom_components.cellarion.const import DOMAIN
+
+# @feature push
 from custom_components.cellarion.push import PUSH_FORBIDDEN_ISSUE, push_issue_id
 
+# @endfeature
 from .conftest import BASE_URL, STATS_PAYLOAD, TEST_TOKEN, mock_cellarion_api
 
 
@@ -48,6 +51,7 @@ async def test_revoked_token_starts_reauth(
     assert any(flow["handler"] == DOMAIN for flow in flows)
 
 
+# @feature push
 async def test_unload_clears_push_issue(hass: HomeAssistant, aioclient_mock, token_entry) -> None:
     """Unloading removes the entry's own push repair issue, nobody else's."""
     token_entry.add_to_hass(hass)
@@ -73,6 +77,7 @@ async def test_unload_clears_push_issue(hass: HomeAssistant, aioclient_mock, tok
     assert registry.async_get_issue(DOMAIN, push_issue_id("other-entry")) is not None
 
 
+# @endfeature
 async def test_null_payload_sections_do_not_break_setup(
     hass: HomeAssistant, aioclient_mock, token_entry
 ) -> None:
@@ -129,6 +134,7 @@ async def test_missing_scope_at_setup_starts_reauth(
     )
 
 
+# @feature frontend
 class _FakeResources:
     """Stand-in for Lovelace's resource collection."""
 
@@ -220,6 +226,7 @@ async def test_card_registration_never_blocks_setup(
     assert "YAML mode" in caplog.text
 
 
+# @endfeature
 async def test_legacy_password_entry_needs_reauth(
     hass: HomeAssistant, aioclient_mock, password_entry
 ) -> None:
@@ -271,6 +278,7 @@ async def test_options_change_reloads_entry(
     assert token_entry.runtime_data.update_interval.total_seconds() == 900
 
 
+# @feature push
 async def test_remove_entry_clears_push_issue(
     hass: HomeAssistant, aioclient_mock, token_entry
 ) -> None:
@@ -294,6 +302,8 @@ async def test_remove_entry_clears_push_issue(
     assert ir.async_get(hass).async_get_issue(DOMAIN, push_issue_id(token_entry.entry_id)) is None
 
 
+# @endfeature
+# @feature frontend
 class _BrokenResources:
     loaded = False
 
@@ -304,6 +314,7 @@ class _BrokenResources:
 async def test_card_registration_failure_is_only_a_warning(
     hass: HomeAssistant, aioclient_mock, token_entry, caplog
 ) -> None:
+    """A resource collection that raises must not stop the entry from loading."""
     hass.data["lovelace"] = _lovelace(_BrokenResources())
     token_entry.add_to_hass(hass)
     mock_cellarion_api(aioclient_mock)
@@ -314,6 +325,7 @@ async def test_card_registration_failure_is_only_a_warning(
     assert "Could not register the Cellarion card automatically" in caplog.text
 
 
+# @endfeature
 async def test_remove_entry_revokes_its_token(
     hass: HomeAssistant, aioclient_mock, token_entry, caplog
 ) -> None:

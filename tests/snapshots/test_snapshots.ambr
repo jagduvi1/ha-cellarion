@@ -1,0 +1,680 @@
+# serializer version: 1
+# name: test_sensor_snapshots[sensor.cellarion_average_rating-entry]
+  dict({
+    'capabilities': dict({
+      'state_class': <SensorStateClass.MEASUREMENT: 'measurement'>,
+    }),
+    'device_class': None,
+    'disabled_by': None,
+    'entity_category': None,
+    'has_entity_name': True,
+    'original_device_class': None,
+    'original_name': 'Average rating',
+    'translation_key': 'average_rating',
+    'unique_id': 'cellarion-test-entry_average_rating',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensor_snapshots[sensor.cellarion_average_rating-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      'friendly_name': 'Cellarion Average rating',
+      'state_class': <SensorStateClass.MEASUREMENT: 'measurement'>,
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.cellarion_average_rating',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '4.2',
+  })
+# ---
+# name: test_sensor_snapshots[sensor.cellarion_bottles_at_peak-entry]
+  dict({
+    'capabilities': dict({
+      'state_class': <SensorStateClass.MEASUREMENT: 'measurement'>,
+    }),
+    'device_class': None,
+    'disabled_by': None,
+    'entity_category': None,
+    'has_entity_name': True,
+    'original_device_class': None,
+    'original_name': 'Bottles at peak',
+    'translation_key': 'bottles_at_peak',
+    'unique_id': 'cellarion-test-entry_bottles_at_peak',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensor_snapshots[sensor.cellarion_bottles_at_peak-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      'friendly_name': 'Cellarion Bottles at peak',
+      'peak_bottles': list([
+        dict({
+          'drink_to': 2027,
+          'id': 'PEAK-SOON',
+          'name': 'Soon Wine',
+          'producer': 'P2',
+          'vintage': 2018,
+        }),
+        dict({
+          'drink_to': 2032,
+          'id': 'PEAK-LATER',
+          'name': 'Later Wine',
+          'producer': 'P1',
+          'vintage': 2019,
+        }),
+      ]),
+      'state_class': <SensorStateClass.MEASUREMENT: 'measurement'>,
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.cellarion_bottles_at_peak',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '12',
+  })
+# ---
+# name: test_sensor_snapshots[sensor.cellarion_bottles_declining-entry]
+  dict({
+    'capabilities': dict({
+      'state_class': <SensorStateClass.MEASUREMENT: 'measurement'>,
+    }),
+    'device_class': None,
+    'disabled_by': None,
+    'entity_category': None,
+    'has_entity_name': True,
+    'original_device_class': None,
+    'original_name': 'Bottles declining',
+    'translation_key': 'bottles_declining',
+    'unique_id': 'cellarion-test-entry_bottles_declining',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensor_snapshots[sensor.cellarion_bottles_declining-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      'friendly_name': 'Cellarion Bottles declining',
+      'state_class': <SensorStateClass.MEASUREMENT: 'measurement'>,
+      'urgent_bottles': list([
+        dict({
+          'id': 'URGENT1',
+          'name': 'Old Barolo',
+          'status': 'declining',
+          'vintage': 2005,
+        }),
+      ]),
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.cellarion_bottles_declining',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '3',
+  })
+# ---
+# name: test_sensor_snapshots[sensor.cellarion_bottles_early_window-entry]
+  dict({
+    'capabilities': dict({
+      'state_class': <SensorStateClass.MEASUREMENT: 'measurement'>,
+    }),
+    'device_class': None,
+    'disabled_by': None,
+    'entity_category': None,
+    'has_entity_name': True,
+    'original_device_class': None,
+    'original_name': 'Bottles early window',
+    'translation_key': 'bottles_early',
+    'unique_id': 'cellarion-test-entry_bottles_early',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensor_snapshots[sensor.cellarion_bottles_early_window-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      'friendly_name': 'Cellarion Bottles early window',
+      'state_class': <SensorStateClass.MEASUREMENT: 'measurement'>,
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.cellarion_bottles_early_window',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '6',
+  })
+# ---
+# name: test_sensor_snapshots[sensor.cellarion_bottles_late_window-entry]
+  dict({
+    'capabilities': dict({
+      'state_class': <SensorStateClass.MEASUREMENT: 'measurement'>,
+    }),
+    'device_class': None,
+    'disabled_by': None,
+    'entity_category': None,
+    'has_entity_name': True,
+    'original_device_class': None,
+    'original_name': 'Bottles late window',
+    'translation_key': 'bottles_late',
+    'unique_id': 'cellarion-test-entry_bottles_late',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensor_snapshots[sensor.cellarion_bottles_late_window-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      'friendly_name': 'Cellarion Bottles late window',
+      'state_class': <SensorStateClass.MEASUREMENT: 'measurement'>,
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.cellarion_bottles_late_window',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '1',
+  })
+# ---
+# name: test_sensor_snapshots[sensor.cellarion_bottles_not_ready-entry]
+  dict({
+    'capabilities': dict({
+      'state_class': <SensorStateClass.MEASUREMENT: 'measurement'>,
+    }),
+    'device_class': None,
+    'disabled_by': None,
+    'entity_category': None,
+    'has_entity_name': True,
+    'original_device_class': None,
+    'original_name': 'Bottles not ready',
+    'translation_key': 'bottles_not_ready',
+    'unique_id': 'cellarion-test-entry_bottles_not_ready',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensor_snapshots[sensor.cellarion_bottles_not_ready-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      'friendly_name': 'Cellarion Bottles not ready',
+      'state_class': <SensorStateClass.MEASUREMENT: 'measurement'>,
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.cellarion_bottles_not_ready',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '20',
+  })
+# ---
+# name: test_sensor_snapshots[sensor.cellarion_cellars-entry]
+  dict({
+    'capabilities': dict({
+      'state_class': <SensorStateClass.MEASUREMENT: 'measurement'>,
+    }),
+    'device_class': None,
+    'disabled_by': None,
+    'entity_category': None,
+    'has_entity_name': True,
+    'original_device_class': None,
+    'original_name': 'Cellars',
+    'translation_key': 'cellar_count',
+    'unique_id': 'cellarion-test-entry_cellar_count',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensor_snapshots[sensor.cellarion_cellars-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      'cellars': list([
+        dict({
+          'bottles': 42,
+          'name': 'Main',
+        }),
+      ]),
+      'friendly_name': 'Cellarion Cellars',
+      'state_class': <SensorStateClass.MEASUREMENT: 'measurement'>,
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.cellarion_cellars',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '1',
+  })
+# ---
+# name: test_sensor_snapshots[sensor.cellarion_collection_health_score-entry]
+  dict({
+    'capabilities': dict({
+      'state_class': <SensorStateClass.MEASUREMENT: 'measurement'>,
+    }),
+    'device_class': None,
+    'disabled_by': None,
+    'entity_category': None,
+    'has_entity_name': True,
+    'original_device_class': None,
+    'original_name': 'Collection health score',
+    'translation_key': 'health_score',
+    'unique_id': 'cellarion-test-entry_health_score',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensor_snapshots[sensor.cellarion_collection_health_score-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      'friendly_name': 'Cellarion Collection health score',
+      'grade': 'B+',
+      'state_class': <SensorStateClass.MEASUREMENT: 'measurement'>,
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.cellarion_collection_health_score',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '87',
+  })
+# ---
+# name: test_sensor_snapshots[sensor.cellarion_collection_value-entry]
+  dict({
+    'capabilities': dict({
+      'state_class': <SensorStateClass.TOTAL: 'total'>,
+    }),
+    'device_class': None,
+    'disabled_by': None,
+    'entity_category': None,
+    'has_entity_name': True,
+    'original_device_class': <SensorDeviceClass.MONETARY: 'monetary'>,
+    'original_name': 'Collection value',
+    'translation_key': 'collection_value',
+    'unique_id': 'cellarion-test-entry_collection_value',
+    'unit_of_measurement': 'EUR',
+  })
+# ---
+# name: test_sensor_snapshots[sensor.cellarion_collection_value-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      'average_price': 29.4,
+      'currency': 'EUR',
+      'device_class': 'monetary',
+      'friendly_name': 'Cellarion Collection value',
+      'state_class': <SensorStateClass.TOTAL: 'total'>,
+      'unit_of_measurement': 'EUR',
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.cellarion_collection_value',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '1234.5',
+  })
+# ---
+# name: test_sensor_snapshots[sensor.cellarion_consumed_bottles-entry]
+  dict({
+    'capabilities': dict({
+      'state_class': <SensorStateClass.TOTAL: 'total'>,
+    }),
+    'device_class': None,
+    'disabled_by': None,
+    'entity_category': <EntityCategory.DIAGNOSTIC: 'diagnostic'>,
+    'has_entity_name': True,
+    'original_device_class': None,
+    'original_name': 'Consumed bottles',
+    'translation_key': 'consumed_bottles',
+    'unique_id': 'cellarion-test-entry_consumed_bottles',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensor_snapshots[sensor.cellarion_consumed_bottles-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      'friendly_name': 'Cellarion Consumed bottles',
+      'state_class': <SensorStateClass.TOTAL: 'total'>,
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.cellarion_consumed_bottles',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '7',
+  })
+# ---
+# name: test_sensor_snapshots[sensor.cellarion_countries-entry]
+  dict({
+    'capabilities': dict({
+      'state_class': <SensorStateClass.MEASUREMENT: 'measurement'>,
+    }),
+    'device_class': None,
+    'disabled_by': None,
+    'entity_category': None,
+    'has_entity_name': True,
+    'original_device_class': None,
+    'original_name': 'Countries',
+    'translation_key': 'countries',
+    'unique_id': 'cellarion-test-entry_countries',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensor_snapshots[sensor.cellarion_countries-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      'friendly_name': 'Cellarion Countries',
+      'state_class': <SensorStateClass.MEASUREMENT: 'measurement'>,
+      'top_countries': list([
+        dict({
+          'count': 20,
+          'name': 'Italy',
+        }),
+      ]),
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.cellarion_countries',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '5',
+  })
+# ---
+# name: test_sensor_snapshots[sensor.cellarion_intake_per_year-entry]
+  dict({
+    'capabilities': dict({
+      'state_class': <SensorStateClass.MEASUREMENT: 'measurement'>,
+    }),
+    'device_class': None,
+    'disabled_by': None,
+    'entity_category': <EntityCategory.DIAGNOSTIC: 'diagnostic'>,
+    'has_entity_name': True,
+    'original_device_class': None,
+    'original_name': 'Intake per year',
+    'translation_key': 'intake_per_year',
+    'unique_id': 'cellarion-test-entry_intake_per_year',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensor_snapshots[sensor.cellarion_intake_per_year-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      'friendly_name': 'Cellarion Intake per year',
+      'state_class': <SensorStateClass.MEASUREMENT: 'measurement'>,
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.cellarion_intake_per_year',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '24.2',
+  })
+# ---
+# name: test_sensor_snapshots[sensor.cellarion_newest_vintage-entry]
+  dict({
+    'capabilities': None,
+    'device_class': None,
+    'disabled_by': None,
+    'entity_category': None,
+    'has_entity_name': True,
+    'original_device_class': None,
+    'original_name': 'Newest vintage',
+    'translation_key': 'newest_vintage',
+    'unique_id': 'cellarion-test-entry_newest_vintage',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensor_snapshots[sensor.cellarion_newest_vintage-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      'friendly_name': 'Cellarion Newest vintage',
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.cellarion_newest_vintage',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '2024',
+  })
+# ---
+# name: test_sensor_snapshots[sensor.cellarion_oldest_vintage-entry]
+  dict({
+    'capabilities': None,
+    'device_class': None,
+    'disabled_by': None,
+    'entity_category': None,
+    'has_entity_name': True,
+    'original_device_class': None,
+    'original_name': 'Oldest vintage',
+    'translation_key': 'oldest_vintage',
+    'unique_id': 'cellarion-test-entry_oldest_vintage',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensor_snapshots[sensor.cellarion_oldest_vintage-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      'friendly_name': 'Cellarion Oldest vintage',
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.cellarion_oldest_vintage',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '1999',
+  })
+# ---
+# name: test_sensor_snapshots[sensor.cellarion_runway_years-entry]
+  dict({
+    'capabilities': dict({
+      'state_class': <SensorStateClass.MEASUREMENT: 'measurement'>,
+    }),
+    'device_class': None,
+    'disabled_by': None,
+    'entity_category': <EntityCategory.DIAGNOSTIC: 'diagnostic'>,
+    'has_entity_name': True,
+    'original_device_class': None,
+    'original_name': 'Runway (years)',
+    'translation_key': 'runway_years',
+    'unique_id': 'cellarion-test-entry_runway_years',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensor_snapshots[sensor.cellarion_runway_years-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      'friendly_name': 'Cellarion Runway (years)',
+      'state_class': <SensorStateClass.MEASUREMENT: 'measurement'>,
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.cellarion_runway_years',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '6.4',
+  })
+# ---
+# name: test_sensor_snapshots[sensor.cellarion_service_status-entry]
+  dict({
+    'capabilities': dict({
+      'options': list([
+        'ok',
+        'degraded',
+        'unreachable',
+        'unknown',
+      ]),
+    }),
+    'device_class': None,
+    'disabled_by': None,
+    'entity_category': <EntityCategory.DIAGNOSTIC: 'diagnostic'>,
+    'has_entity_name': True,
+    'original_device_class': <SensorDeviceClass.ENUM: 'enum'>,
+    'original_name': 'Service status',
+    'translation_key': 'service_health',
+    'unique_id': 'cellarion-test-entry_service_health',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensor_snapshots[sensor.cellarion_service_status-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      'device_class': 'enum',
+      'friendly_name': 'Cellarion Service status',
+      'instance_url': 'http://cellarion.local',
+      'options': list([
+        'ok',
+        'degraded',
+        'unreachable',
+        'unknown',
+      ]),
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.cellarion_service_status',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': 'ok',
+  })
+# ---
+# name: test_sensor_snapshots[sensor.cellarion_top_producers-entry]
+  dict({
+    'capabilities': None,
+    'device_class': None,
+    'disabled_by': None,
+    'entity_category': None,
+    'has_entity_name': True,
+    'original_device_class': None,
+    'original_name': 'Top producers',
+    'translation_key': 'top_producers',
+    'unique_id': 'cellarion-test-entry_top_producers',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensor_snapshots[sensor.cellarion_top_producers-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      'friendly_name': 'Cellarion Top producers',
+      'producers': list([
+        dict({
+          'count': 9,
+          'name': 'Test Winery',
+        }),
+      ]),
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.cellarion_top_producers',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '1',
+  })
+# ---
+# name: test_sensor_snapshots[sensor.cellarion_total_bottles-entry]
+  dict({
+    'capabilities': dict({
+      'state_class': <SensorStateClass.MEASUREMENT: 'measurement'>,
+    }),
+    'device_class': None,
+    'disabled_by': None,
+    'entity_category': None,
+    'has_entity_name': True,
+    'original_device_class': None,
+    'original_name': 'Total bottles',
+    'translation_key': 'total_bottles',
+    'unique_id': 'cellarion-test-entry_total_bottles',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensor_snapshots[sensor.cellarion_total_bottles-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      'friendly_name': 'Cellarion Total bottles',
+      'state_class': <SensorStateClass.MEASUREMENT: 'measurement'>,
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.cellarion_total_bottles',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '42',
+  })
+# ---
+# name: test_sensor_snapshots[sensor.cellarion_unique_wines-entry]
+  dict({
+    'capabilities': dict({
+      'state_class': <SensorStateClass.MEASUREMENT: 'measurement'>,
+    }),
+    'device_class': None,
+    'disabled_by': None,
+    'entity_category': None,
+    'has_entity_name': True,
+    'original_device_class': None,
+    'original_name': 'Unique wines',
+    'translation_key': 'unique_wines',
+    'unique_id': 'cellarion-test-entry_unique_wines',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensor_snapshots[sensor.cellarion_unique_wines-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      'friendly_name': 'Cellarion Unique wines',
+      'state_class': <SensorStateClass.MEASUREMENT: 'measurement'>,
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.cellarion_unique_wines',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '30',
+  })
+# ---
+# name: test_sensor_snapshots[sensor.cellarion_unread_notifications-entry]
+  dict({
+    'capabilities': dict({
+      'state_class': <SensorStateClass.MEASUREMENT: 'measurement'>,
+    }),
+    'device_class': None,
+    'disabled_by': None,
+    'entity_category': None,
+    'has_entity_name': True,
+    'original_device_class': None,
+    'original_name': 'Unread notifications',
+    'translation_key': 'unread_notifications',
+    'unique_id': 'cellarion-test-entry_unread_notifications',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensor_snapshots[sensor.cellarion_unread_notifications-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      'friendly_name': 'Cellarion Unread notifications',
+      'state_class': <SensorStateClass.MEASUREMENT: 'measurement'>,
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.cellarion_unread_notifications',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '2',
+  })
+# ---
+# name: test_sensor_snapshots[sensor.cellarion_wine_types-entry]
+  dict({
+    'capabilities': None,
+    'device_class': None,
+    'disabled_by': None,
+    'entity_category': None,
+    'has_entity_name': True,
+    'original_device_class': None,
+    'original_name': 'Wine types',
+    'translation_key': 'wine_types',
+    'unique_id': 'cellarion-test-entry_wine_types',
+    'unit_of_measurement': None,
+  })
+# ---
+# name: test_sensor_snapshots[sensor.cellarion_wine_types-state]
+  StateSnapshot({
+    'attributes': ReadOnlyDict({
+      'friendly_name': 'Cellarion Wine types',
+      'red': 30,
+      'white': 12,
+    }),
+    'context': <ANY>,
+    'entity_id': 'sensor.cellarion_wine_types',
+    'last_changed': <ANY>,
+    'last_reported': <ANY>,
+    'last_updated': <ANY>,
+    'state': '2',
+  })
+# ---
