@@ -8,9 +8,14 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.setup import async_setup_component
 
+import voluptuous as vol
+
 from custom_components.cellarion.const import DOMAIN
 
 from .conftest import BASE_URL, mock_cellarion_api
+
+# Cellarion bottle ids are MongoDB ObjectIds (24 hex chars)
+BOTTLE1 = "6a50805b785f507654afdc51"
 
 
 async def test_consume_bottle(hass: HomeAssistant, aioclient_mock, token_entry) -> None:
@@ -18,7 +23,7 @@ async def test_consume_bottle(hass: HomeAssistant, aioclient_mock, token_entry) 
     token_entry.add_to_hass(hass)
     mock_cellarion_api(aioclient_mock)
     aioclient_mock.post(
-        f"{BASE_URL}/api/bottles/BOTTLE1/consume", json={"bottle": {}}
+        f"{BASE_URL}/api/bottles/{BOTTLE1}/consume", json={"bottle": {}}
     )
     assert await hass.config_entries.async_setup(token_entry.entry_id)
     await hass.async_block_till_done()
@@ -26,14 +31,14 @@ async def test_consume_bottle(hass: HomeAssistant, aioclient_mock, token_entry) 
     await hass.services.async_call(
         DOMAIN,
         "consume_bottle",
-        {"bottle_id": "BOTTLE1", "reason": "gifted", "rating": 4.5, "note": "hi"},
+        {"bottle_id": BOTTLE1, "reason": "gifted", "rating": 4.5, "note": "hi"},
         blocking=True,
     )
 
     consume_calls = [
         call
         for call in aioclient_mock.mock_calls
-        if str(call[1]).endswith("/api/bottles/BOTTLE1/consume")
+        if str(call[1]).endswith(f"/api/bottles/{BOTTLE1}/consume")
     ]
     assert len(consume_calls) == 1
     assert consume_calls[0][2] == {
@@ -50,7 +55,7 @@ async def test_consume_bottle_accepts_201(
     token_entry.add_to_hass(hass)
     mock_cellarion_api(aioclient_mock)
     aioclient_mock.post(
-        f"{BASE_URL}/api/bottles/BOTTLE1/consume",
+        f"{BASE_URL}/api/bottles/{BOTTLE1}/consume",
         status=201,
         json={"bottle": {}},
     )
@@ -59,7 +64,7 @@ async def test_consume_bottle_accepts_201(
 
     # Must not raise despite the non-200 success status
     await hass.services.async_call(
-        DOMAIN, "consume_bottle", {"bottle_id": "BOTTLE1"}, blocking=True
+        DOMAIN, "consume_bottle", {"bottle_id": BOTTLE1}, blocking=True
     )
 
 
@@ -70,7 +75,7 @@ async def test_consume_without_entries(hass: HomeAssistant) -> None:
 
     with pytest.raises(ServiceValidationError):
         await hass.services.async_call(
-            DOMAIN, "consume_bottle", {"bottle_id": "X"}, blocking=True
+            DOMAIN, "consume_bottle", {"bottle_id": BOTTLE1}, blocking=True
         )
 
 
@@ -87,7 +92,7 @@ async def test_consume_unknown_entry_id(
         await hass.services.async_call(
             DOMAIN,
             "consume_bottle",
-            {"bottle_id": "X", "entry_id": "nope"},
+            {"bottle_id": BOTTLE1, "entry_id": "nope"},
             blocking=True,
         )
 
@@ -99,7 +104,7 @@ async def test_consume_api_error(
     token_entry.add_to_hass(hass)
     mock_cellarion_api(aioclient_mock)
     aioclient_mock.post(
-        f"{BASE_URL}/api/bottles/BOTTLE1/consume",
+        f"{BASE_URL}/api/bottles/{BOTTLE1}/consume",
         status=500,
         json={"error": "boom"},
     )
@@ -108,5 +113,77 @@ async def test_consume_api_error(
 
     with pytest.raises(HomeAssistantError):
         await hass.services.async_call(
-            DOMAIN, "consume_bottle", {"bottle_id": "BOTTLE1"}, blocking=True
+            DOMAIN, "consume_bottle", {"bottle_id": BOTTLE1}, blocking=True
         )
+
+
+@pytest.mark.parametrize(
+    "bad_id",
+    ["BOTTLE1", "../../auth/whoami", "6a50805b785f507654afdc51#", "", "x" * 24],
+)
+async def test_consume_rejects_malformed_bottle_id(
+    hass: HomeAssistant, aioclient_mock, token_entry, bad_id
+) -> None:
+    """Only a 24-hex ObjectId is accepted — the id goes into a URL path."""
+    token_entry.add_to_hass(hass)
+    mock_cellarion_api(aioclient_mock)
+    assert await hass.config_entries.async_setup(token_entry.entry_id)
+    await hass.async_block_till_done()
+
+    with pytest.raises(vol.Invalid):
+        await hass.services.async_call(
+            DOMAIN, "consume_bottle", {"bottle_id": bad_id}, blocking=True
+        )
+    assert not any(
+        "/consume" in str(call[1]) for call in aioclient_mock.mock_calls
+    )
+
+
+async def test_consume_scope_error_is_validation_error(
+    hass: HomeAssistant, aioclient_mock, token_entry
+) -> None:
+    """A token without the consume scope gets a specific, actionable error."""
+    token_entry.add_to_hass(hass)
+    mock_cellarion_api(aioclient_mock)
+    aioclient_mock.post(
+        f"{BASE_URL}/api/bottles/{BOTTLE1}/consume",
+        status=403,
+        json={"error": "scope"},
+    )
+    assert await hass.config_entries.async_setup(token_entry.entry_id)
+    await hass.async_block_till_done()
+
+    with pytest.raises(ServiceValidationError) as excinfo:
+        await hass.services.async_call(
+            DOMAIN, "consume_bottle", {"bottle_id": BOTTLE1}, blocking=True
+        )
+    assert excinfo.value.translation_key == "consume_scope_missing"
+    # No reauth: the token is valid, it just needs a different scope
+    assert not hass.config_entries.flow.async_progress()
+
+
+async def test_consume_auth_error_starts_reauth(
+    hass: HomeAssistant, aioclient_mock, token_entry
+) -> None:
+    """A revoked token during consume raises and opens the reauth flow."""
+    token_entry.add_to_hass(hass)
+    mock_cellarion_api(aioclient_mock)
+    aioclient_mock.post(
+        f"{BASE_URL}/api/bottles/{BOTTLE1}/consume",
+        status=401,
+        json={"error": "revoked"},
+    )
+    assert await hass.config_entries.async_setup(token_entry.entry_id)
+    await hass.async_block_till_done()
+
+    with pytest.raises(HomeAssistantError) as excinfo:
+        await hass.services.async_call(
+            DOMAIN, "consume_bottle", {"bottle_id": BOTTLE1}, blocking=True
+        )
+    assert excinfo.value.translation_key == "consume_auth_failed"
+    await hass.async_block_till_done()
+    flows = hass.config_entries.flow.async_progress()
+    assert any(
+        flow["handler"] == DOMAIN and flow["context"]["source"] == "reauth"
+        for flow in flows
+    )

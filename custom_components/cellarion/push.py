@@ -17,6 +17,7 @@ import asyncio
 import logging
 import random
 import time
+from asyncio import CancelledError
 from datetime import timedelta
 
 from homeassistant.helpers import issue_registry as ir
@@ -47,11 +48,22 @@ STABLE_CONNECTION_SECONDS = RECONNECT_MIN_SECONDS
 PUSH_POLL_INTERVAL = timedelta(hours=6)
 
 
+def push_issue_id(entry_id: str) -> str:
+    """Repair-issue id for one config entry's push stream.
+
+    Keyed per entry so that a second account connecting never clears the
+    warning that belongs to the first, and so unload can remove exactly its own.
+    """
+    return f"{PUSH_FORBIDDEN_ISSUE}_{entry_id}"
+
+
 async def async_push_listener(coordinator: CellarionCoordinator) -> None:
     """Run forever: connect, forward events, reconnect with backoff."""
     base_interval = coordinator.update_interval
     unsupported_logged = False
+    unexpected_logged = False
     backoff = RECONNECT_MIN_SECONDS
+    issue_id = push_issue_id(coordinator.config_entry.entry_id)
 
     try:
         while True:
@@ -67,9 +79,7 @@ async def async_push_listener(coordinator: CellarionCoordinator) -> None:
                         # stable. It is reset below once the connection has
                         # lasted STABLE_CONNECTION_SECONDS.
                         coordinator.update_interval = PUSH_POLL_INTERVAL
-                        ir.async_delete_issue(
-                            coordinator.hass, DOMAIN, PUSH_FORBIDDEN_ISSUE
-                        )
+                        ir.async_delete_issue(coordinator.hass, DOMAIN, issue_id)
                         _LOGGER.debug(
                             "Push stream connected; polling relaxed to %s",
                             PUSH_POLL_INTERVAL,
@@ -89,7 +99,7 @@ async def async_push_listener(coordinator: CellarionCoordinator) -> None:
                 ir.async_create_issue(
                     coordinator.hass,
                     DOMAIN,
-                    PUSH_FORBIDDEN_ISSUE,
+                    issue_id,
                     is_fixable=False,
                     severity=ir.IssueSeverity.WARNING,
                     translation_key=PUSH_FORBIDDEN_ISSUE,
@@ -112,6 +122,19 @@ async def async_push_listener(coordinator: CellarionCoordinator) -> None:
                 return
             except CellarionApiError as err:
                 _LOGGER.debug("Push stream error: %s", err)
+            except CancelledError:
+                raise
+            except Exception:  # noqa: BLE001
+                # Anything the client didn't map must not end the listener
+                # for good: log it once at warning level, then keep the
+                # reconnect loop (with backoff) going.
+                _LOGGER.log(
+                    logging.DEBUG if unexpected_logged else logging.WARNING,
+                    "Unexpected error in the Cellarion push stream; "
+                    "reconnecting with backoff",
+                    exc_info=True,
+                )
+                unexpected_logged = True
             finally:
                 if connected:
                     coordinator.update_interval = base_interval
@@ -130,7 +153,7 @@ async def async_push_listener(coordinator: CellarionCoordinator) -> None:
                 # up anything missed during the gap.
                 await coordinator.async_request_refresh()
 
-            await asyncio.sleep(backoff * (1 + random.random() * 0.25))
+            await asyncio.sleep(backoff * (1 + random.random() * 0.25))  # noqa: S311
             backoff = min(backoff * 2, RECONNECT_MAX_SECONDS)
     finally:
         coordinator.update_interval = base_interval

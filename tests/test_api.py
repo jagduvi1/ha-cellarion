@@ -9,6 +9,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from custom_components.cellarion.api import (
     CellarionApiClient,
+    CellarionApiError,
     CellarionAuthError,
     CellarionScopeError,
     CellarionTokensNotSupported,
@@ -122,3 +123,50 @@ async def test_create_token_not_supported(
     )
     with pytest.raises(CellarionTokensNotSupported):
         await client.async_create_api_token("HA", ["read"])
+
+
+async def test_login_does_not_follow_redirects(
+    hass: HomeAssistant, aioclient_mock
+) -> None:
+    """A redirected login is an error, never a re-post of the password."""
+    aioclient_mock.post(
+        f"{BASE_URL}/api/auth/login",
+        status=307,
+        headers={"Location": "https://elsewhere.example/login"},
+    )
+    client = CellarionApiClient(
+        async_get_clientsession(hass), BASE_URL, "user@example.com", "pw"
+    )
+    with pytest.raises(CellarionApiError, match="redirected"):
+        await client.authenticate()
+    assert len(aioclient_mock.mock_calls) == 1
+
+
+async def test_login_non_json_body_is_api_error(
+    hass: HomeAssistant, aioclient_mock
+) -> None:
+    """A proxy answering 200 with HTML maps to a normal API error."""
+    aioclient_mock.post(
+        f"{BASE_URL}/api/auth/login",
+        text="<html>login page</html>",
+        headers={"Content-Type": "text/html"},
+    )
+    client = CellarionApiClient(
+        async_get_clientsession(hass), BASE_URL, "user@example.com", "pw"
+    )
+    with pytest.raises(CellarionApiError, match="not JSON"):
+        await client.authenticate()
+
+
+async def test_consume_quotes_bottle_id(hass: HomeAssistant, aioclient_mock) -> None:
+    """Path characters in a bottle id are escaped, not interpreted."""
+    aioclient_mock.post(
+        f"{BASE_URL}/api/bottles/abc%2F..%2Fx/consume", json={"ok": True}
+    )
+    client = CellarionApiClient(
+        async_get_clientsession(hass), BASE_URL, token=TEST_TOKEN
+    )
+    await client.consume_bottle("abc/../x")
+    assert str(aioclient_mock.mock_calls[0][1]).endswith(
+        "/api/bottles/abc%2F..%2Fx/consume"
+    )

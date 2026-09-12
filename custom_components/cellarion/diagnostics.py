@@ -19,9 +19,20 @@ if TYPE_CHECKING:
     from . import CellarionConfigEntry
 
 TO_REDACT = {CONF_TOKEN, CONF_PASSWORD, CONF_EMAIL, CONF_URL, CONF_ACCOUNT_ID}
-# Keys inside coordinator.data that identify the instance or hold personal
-# content (notification text) — redacted from the diagnostics dump.
-DATA_TO_REDACT = {"instance_url", "notifications"}
+# Keys inside coordinator.data that identify the instance, the account or
+# individual records, or hold personal content (notification text) — redacted
+# from the diagnostics dump. Raw server objects (cellars) carry the owner id
+# and member list, so those keys are covered at any depth.
+DATA_TO_REDACT = {
+    "instance_url",
+    "notifications",
+    "user",
+    "owner",
+    "members",
+    "userColors",
+    "_id",
+    "id",
+}
 
 
 async def async_get_config_entry_diagnostics(
