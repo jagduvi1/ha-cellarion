@@ -156,3 +156,6 @@ class CellarionCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "instance_url": self.url,
             "peak_bottles": peak_bottles,
         }
+
+
+type CellarionConfigEntry = ConfigEntry[CellarionCoordinator]

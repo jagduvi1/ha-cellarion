@@ -419,6 +419,13 @@ node --test tests/                 # bundled card tests
 ruff check . && mypy custom_components/cellarion
 ```
 
+This repository is the single source of truth for a future Home Assistant
+core submission as well. `tools/export_core.py` generates the core layout
+(`homeassistant/components/cellarion/` plus its tests) from it, minus the
+bundled card and, for the minimal first pull request, minus the optional
+features; `quality_scale.yaml` documents the rules the integration claims.
+Changes are always made here and re-exported, never in the core copy.
+
 ## License
 
 MIT

@@ -16,7 +16,7 @@ from .const import (
 )
 
 if TYPE_CHECKING:
-    from . import CellarionConfigEntry
+    from .coordinator import CellarionConfigEntry
 
 TO_REDACT = {CONF_TOKEN, CONF_PASSWORD, CONF_EMAIL, CONF_URL, CONF_ACCOUNT_ID}
 # Keys inside coordinator.data that identify the instance, the account or
