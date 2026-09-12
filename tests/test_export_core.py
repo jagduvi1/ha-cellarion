@@ -78,12 +78,21 @@ def test_export_produces_a_core_layout(tmp_path: Path, stage: str) -> None:
     assert "custom_components" not in conftest
     assert "from tests.common import MockConfigEntry" in conftest
     assert "enable_custom_integrations" not in conftest
+    for test_file in tests.glob("*.py"):
+        text = test_file.read_text(encoding="utf-8")
+        assert "@feature" not in text, test_file.name
+        assert "from __future__" not in text, test_file.name
     if stage == "minimal":
         assert "test_services.py" not in test_names and "test_push.py" not in test_names
+        init_tests = (tests / "test_init.py").read_text(encoding="utf-8")
+        assert "push_issue_id" not in init_tests and "_FakeResources" not in init_tests
 
 
 def test_feature_blocks_are_balanced() -> None:
     """A stray marker would silently drop code; make that a test failure."""
-    for module in (ROOT / "custom_components" / "cellarion").glob("*.py"):
+    for module in [
+        *(ROOT / "custom_components" / "cellarion").glob("*.py"),
+        *(ROOT / "tests").glob("*.py"),
+    ]:
         text = module.read_text(encoding="utf-8")
         assert text.count("# @feature ") == text.count("# @endfeature"), module.name

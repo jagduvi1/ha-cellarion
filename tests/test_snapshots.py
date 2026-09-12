@@ -33,4 +33,17 @@ async def test_sensor_snapshots(
         state = hass.states.get(entry.entity_id)
         assert state, entry.entity_id
         assert state == snapshot(name=f"{entry.entity_id}-state")
-        assert entry == snapshot(name=f"{entry.entity_id}-entry")
+        # The registry entry itself gains fields between HA releases; the
+        # parts the integration controls are what must stay stable.
+        assert {
+            "unique_id": entry.unique_id,
+            "translation_key": entry.translation_key,
+            "original_name": entry.original_name,
+            "device_class": entry.device_class,
+            "original_device_class": entry.original_device_class,
+            "entity_category": entry.entity_category,
+            "disabled_by": entry.disabled_by,
+            "unit_of_measurement": entry.unit_of_measurement,
+            "capabilities": entry.capabilities,
+            "has_entity_name": entry.has_entity_name,
+        } == snapshot(name=f"{entry.entity_id}-entry")

@@ -5,7 +5,7 @@ from __future__ import annotations
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import entity_registry as er
 
-from custom_components.cellarion.coordinator import _parse_peak_bottles
+from custom_components.cellarion.coordinator import _health_state, _parse_peak_bottles
 from custom_components.cellarion.sensor import SENSOR_DESCRIPTIONS
 
 from .conftest import mock_cellarion_api
@@ -159,8 +159,6 @@ async def test_service_status_is_an_enum(hass: HomeAssistant, aioclient_mock, to
     assert status.state == "ok"
     assert status.attributes["device_class"] == "enum"
     assert status.attributes["options"] == ["ok", "degraded", "unreachable", "unknown"]
-
-    from custom_components.cellarion.coordinator import _health_state
 
     assert _health_state("DEGRADED") == "degraded"
     assert _health_state("on-fire") == "unknown"

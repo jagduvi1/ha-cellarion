@@ -25,8 +25,9 @@ What the export does:
 - drops translations/en.json (core generates it from strings.json) and
   trims strings.json sections that belong to excluded features
 - rewrites the tests for core's tree and fixtures
-- runs `ruff check --fix` on the result when ruff is installed, which removes
-  imports left unused by dropped blocks
+- runs `ruff check --fix` (and, in a core checkout, `ruff format`) when ruff
+  is installed, and regenerates translations/en.json in a core checkout
+- adds the integration to core's .strict-typing
 """
 
 from __future__ import annotations
@@ -105,6 +106,26 @@ def strip_features(text: str, keep: set[str]) -> str:
     return FEATURE_BLOCK.sub(repl, text)
 
 
+def drop_future_annotations(text: str) -> str:
+    """Core forbids `from __future__ import annotations` (Python 3.14 and up)."""
+    return re.sub(r"^from __future__ import annotations\n\n?", "", text, flags=re.M)
+
+
+def add_strict_typing(dest: Path) -> None:
+    """List the integration in core's .strict-typing (sorted), for the mypy config."""
+    path = dest / ".strict-typing"
+    if not path.is_file():
+        return
+    entry = f"homeassistant.components.{DOMAIN}.*"
+    lines = path.read_text(encoding="utf-8").splitlines()
+    if entry in lines:
+        return
+    components = [line for line in lines if line.startswith("homeassistant.components.")]
+    others = [line for line in lines if not line.startswith("homeassistant.components.")]
+    components = sorted([*components, entry])
+    path.write_text("\n".join([*others, *components]) + "\n", encoding="utf-8")
+
+
 IMPORT_LINE = re.compile(r"^from (?P<module>[\w.]+) import (?P<names>[^(\n]+)$", re.M)
 
 
@@ -178,7 +199,8 @@ def export_strings(text: str, keep: set[str]) -> str:
     return json.dumps(strings, indent=2, ensure_ascii=False) + "\n"
 
 
-def export_test(text: str) -> str:
+def export_test(text: str, keep: set[str]) -> str:
+    text = prune_unused_imports(strip_features(text, keep))
     text = text.replace("custom_components.cellarion", "homeassistant.components.cellarion")
     text = text.replace("pytest_homeassistant_custom_component.common", "tests.common")
     text = text.replace(
@@ -225,19 +247,32 @@ def export(stage: str, dest: Path) -> tuple[Path, Path]:
             (comp / src.name).write_text(export_strings(text or "", keep), encoding="utf-8")
         elif src.suffix == ".py":
             stripped = prune_unused_imports(strip_features(text or "", keep))
-            (comp / src.name).write_text(stripped, encoding="utf-8")
+            (comp / src.name).write_text(drop_future_annotations(stripped), encoding="utf-8")
         elif src.is_file():
             shutil.copy2(src, comp / src.name)
 
-    if (TESTS / "snapshots").is_dir():
+    if (TESTS / "snapshots").is_dir() and not is_core:
         shutil.copytree(TESTS / "snapshots", tests / "snapshots")
     for src in sorted(TESTS.glob("*.py")):
         if src.name in excluded_tests:
             continue
         (tests / src.name).write_text(
-            export_test(src.read_text(encoding="utf-8").replace("\r\n", "\n")), encoding="utf-8"
+            drop_future_annotations(
+                export_test(src.read_text(encoding="utf-8").replace("\r\n", "\n"), keep)
+            ),
+            encoding="utf-8",
         )
 
+    if is_core:
+        add_strict_typing(dest)
+        # Core's tests read translations/en.json, which its script generates
+        # from strings.json; the export just removed the previous one.
+        subprocess.run(
+            [sys.executable, "-m", "script.translations", "develop", "--integration", DOMAIN],
+            cwd=dest,
+            check=False,
+            capture_output=True,
+        )
     if shutil.which("ruff"):
         # Removing an import left unused by a dropped block is an "unsafe"
         # fix in __init__.py as far as ruff is concerned (it could have been
@@ -250,6 +285,9 @@ def export(stage: str, dest: Path) -> tuple[Path, Path]:
         )
         if result.returncode not in (0, 1):
             print(result.stderr, file=sys.stderr)
+        if is_core:
+            # Core's own formatter settings apply inside the checkout
+            subprocess.run(["ruff", "format", "--quiet", str(comp), str(tests)], check=False)
     return comp, tests
 
 
@@ -262,6 +300,15 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     comp, tests = export(args.stage, args.dest)
     print(f"exported stage '{args.stage}' to {comp} and {tests}")
+    if (args.dest / "homeassistant" / "components").is_dir():
+        # Core's snapshot serializer differs from the one the HACS tests use,
+        # so the .ambr files are generated inside core rather than copied.
+        print(
+            "next: python -m pytest tests/components/cellarion --snapshot-update",
+            "      python -m script.hassfest --integration-path homeassistant/components/cellarion",
+            "      python -m script.gen_requirements_all",
+            sep="\n",
+        )
     return 0
 
 

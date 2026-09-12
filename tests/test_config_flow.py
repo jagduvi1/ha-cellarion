@@ -380,6 +380,7 @@ async def test_password_flow_error_mapping(
 
 
 async def test_password_flow_rejects_invalid_url(hass: HomeAssistant, aioclient_mock) -> None:
+    """A malformed URL on the password form is refused before any request."""
     result = await _menu_to(hass, "password")
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"],

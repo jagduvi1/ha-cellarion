@@ -82,6 +82,7 @@ class CellarionCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         scan_interval: int,
         url: str,
     ) -> None:
+        """Initialize the coordinator for one Cellarion account."""
         super().__init__(
             hass,
             _LOGGER,

@@ -1,37 +1,15 @@
 # serializer version: 1
 # name: test_sensor_snapshots[sensor.cellarion_average_rating-entry]
-  EntityRegistryEntrySnapshot({
-    'aliases': set({
-    }),
-    'area_id': None,
+  dict({
     'capabilities': dict({
       'state_class': <SensorStateClass.MEASUREMENT: 'measurement'>,
     }),
-    'config_entry_id': <ANY>,
-    'config_subentry_id': <ANY>,
     'device_class': None,
-    'device_id': <ANY>,
     'disabled_by': None,
-    'domain': 'sensor',
     'entity_category': None,
-    'entity_id': 'sensor.cellarion_average_rating',
     'has_entity_name': True,
-    'hidden_by': None,
-    'icon': None,
-    'id': <ANY>,
-    'labels': set({
-    }),
-    'name': None,
-    'object_id_base': 'Average rating',
-    'options': dict({
-    }),
     'original_device_class': None,
-    'original_icon': None,
     'original_name': 'Average rating',
-    'platform': 'cellarion',
-    'previous_unique_id': None,
-    'suggested_object_id': None,
-    'supported_features': 0,
     'translation_key': 'average_rating',
     'unique_id': 'cellarion-test-entry_average_rating',
     'unit_of_measurement': None,
@@ -52,38 +30,16 @@
   })
 # ---
 # name: test_sensor_snapshots[sensor.cellarion_bottles_at_peak-entry]
-  EntityRegistryEntrySnapshot({
-    'aliases': set({
-    }),
-    'area_id': None,
+  dict({
     'capabilities': dict({
       'state_class': <SensorStateClass.MEASUREMENT: 'measurement'>,
     }),
-    'config_entry_id': <ANY>,
-    'config_subentry_id': <ANY>,
     'device_class': None,
-    'device_id': <ANY>,
     'disabled_by': None,
-    'domain': 'sensor',
     'entity_category': None,
-    'entity_id': 'sensor.cellarion_bottles_at_peak',
     'has_entity_name': True,
-    'hidden_by': None,
-    'icon': None,
-    'id': <ANY>,
-    'labels': set({
-    }),
-    'name': None,
-    'object_id_base': 'Bottles at peak',
-    'options': dict({
-    }),
     'original_device_class': None,
-    'original_icon': None,
     'original_name': 'Bottles at peak',
-    'platform': 'cellarion',
-    'previous_unique_id': None,
-    'suggested_object_id': None,
-    'supported_features': 0,
     'translation_key': 'bottles_at_peak',
     'unique_id': 'cellarion-test-entry_bottles_at_peak',
     'unit_of_measurement': None,
@@ -120,38 +76,16 @@
   })
 # ---
 # name: test_sensor_snapshots[sensor.cellarion_bottles_declining-entry]
-  EntityRegistryEntrySnapshot({
-    'aliases': set({
-    }),
-    'area_id': None,
+  dict({
     'capabilities': dict({
       'state_class': <SensorStateClass.MEASUREMENT: 'measurement'>,
     }),
-    'config_entry_id': <ANY>,
-    'config_subentry_id': <ANY>,
     'device_class': None,
-    'device_id': <ANY>,
     'disabled_by': None,
-    'domain': 'sensor',
     'entity_category': None,
-    'entity_id': 'sensor.cellarion_bottles_declining',
     'has_entity_name': True,
-    'hidden_by': None,
-    'icon': None,
-    'id': <ANY>,
-    'labels': set({
-    }),
-    'name': None,
-    'object_id_base': 'Bottles declining',
-    'options': dict({
-    }),
     'original_device_class': None,
-    'original_icon': None,
     'original_name': 'Bottles declining',
-    'platform': 'cellarion',
-    'previous_unique_id': None,
-    'suggested_object_id': None,
-    'supported_features': 0,
     'translation_key': 'bottles_declining',
     'unique_id': 'cellarion-test-entry_bottles_declining',
     'unit_of_measurement': None,
@@ -180,38 +114,16 @@
   })
 # ---
 # name: test_sensor_snapshots[sensor.cellarion_bottles_early_window-entry]
-  EntityRegistryEntrySnapshot({
-    'aliases': set({
-    }),
-    'area_id': None,
+  dict({
     'capabilities': dict({
       'state_class': <SensorStateClass.MEASUREMENT: 'measurement'>,
     }),
-    'config_entry_id': <ANY>,
-    'config_subentry_id': <ANY>,
     'device_class': None,
-    'device_id': <ANY>,
     'disabled_by': None,
-    'domain': 'sensor',
     'entity_category': None,
-    'entity_id': 'sensor.cellarion_bottles_early_window',
     'has_entity_name': True,
-    'hidden_by': None,
-    'icon': None,
-    'id': <ANY>,
-    'labels': set({
-    }),
-    'name': None,
-    'object_id_base': 'Bottles early window',
-    'options': dict({
-    }),
     'original_device_class': None,
-    'original_icon': None,
     'original_name': 'Bottles early window',
-    'platform': 'cellarion',
-    'previous_unique_id': None,
-    'suggested_object_id': None,
-    'supported_features': 0,
     'translation_key': 'bottles_early',
     'unique_id': 'cellarion-test-entry_bottles_early',
     'unit_of_measurement': None,
@@ -232,38 +144,16 @@
   })
 # ---
 # name: test_sensor_snapshots[sensor.cellarion_bottles_late_window-entry]
-  EntityRegistryEntrySnapshot({
-    'aliases': set({
-    }),
-    'area_id': None,
+  dict({
     'capabilities': dict({
       'state_class': <SensorStateClass.MEASUREMENT: 'measurement'>,
     }),
-    'config_entry_id': <ANY>,
-    'config_subentry_id': <ANY>,
     'device_class': None,
-    'device_id': <ANY>,
     'disabled_by': None,
-    'domain': 'sensor',
     'entity_category': None,
-    'entity_id': 'sensor.cellarion_bottles_late_window',
     'has_entity_name': True,
-    'hidden_by': None,
-    'icon': None,
-    'id': <ANY>,
-    'labels': set({
-    }),
-    'name': None,
-    'object_id_base': 'Bottles late window',
-    'options': dict({
-    }),
     'original_device_class': None,
-    'original_icon': None,
     'original_name': 'Bottles late window',
-    'platform': 'cellarion',
-    'previous_unique_id': None,
-    'suggested_object_id': None,
-    'supported_features': 0,
     'translation_key': 'bottles_late',
     'unique_id': 'cellarion-test-entry_bottles_late',
     'unit_of_measurement': None,
@@ -284,38 +174,16 @@
   })
 # ---
 # name: test_sensor_snapshots[sensor.cellarion_bottles_not_ready-entry]
-  EntityRegistryEntrySnapshot({
-    'aliases': set({
-    }),
-    'area_id': None,
+  dict({
     'capabilities': dict({
       'state_class': <SensorStateClass.MEASUREMENT: 'measurement'>,
     }),
-    'config_entry_id': <ANY>,
-    'config_subentry_id': <ANY>,
     'device_class': None,
-    'device_id': <ANY>,
     'disabled_by': None,
-    'domain': 'sensor',
     'entity_category': None,
-    'entity_id': 'sensor.cellarion_bottles_not_ready',
     'has_entity_name': True,
-    'hidden_by': None,
-    'icon': None,
-    'id': <ANY>,
-    'labels': set({
-    }),
-    'name': None,
-    'object_id_base': 'Bottles not ready',
-    'options': dict({
-    }),
     'original_device_class': None,
-    'original_icon': None,
     'original_name': 'Bottles not ready',
-    'platform': 'cellarion',
-    'previous_unique_id': None,
-    'suggested_object_id': None,
-    'supported_features': 0,
     'translation_key': 'bottles_not_ready',
     'unique_id': 'cellarion-test-entry_bottles_not_ready',
     'unit_of_measurement': None,
@@ -336,38 +204,16 @@
   })
 # ---
 # name: test_sensor_snapshots[sensor.cellarion_cellars-entry]
-  EntityRegistryEntrySnapshot({
-    'aliases': set({
-    }),
-    'area_id': None,
+  dict({
     'capabilities': dict({
       'state_class': <SensorStateClass.MEASUREMENT: 'measurement'>,
     }),
-    'config_entry_id': <ANY>,
-    'config_subentry_id': <ANY>,
     'device_class': None,
-    'device_id': <ANY>,
     'disabled_by': None,
-    'domain': 'sensor',
     'entity_category': None,
-    'entity_id': 'sensor.cellarion_cellars',
     'has_entity_name': True,
-    'hidden_by': None,
-    'icon': None,
-    'id': <ANY>,
-    'labels': set({
-    }),
-    'name': None,
-    'object_id_base': 'Cellars',
-    'options': dict({
-    }),
     'original_device_class': None,
-    'original_icon': None,
     'original_name': 'Cellars',
-    'platform': 'cellarion',
-    'previous_unique_id': None,
-    'suggested_object_id': None,
-    'supported_features': 0,
     'translation_key': 'cellar_count',
     'unique_id': 'cellarion-test-entry_cellar_count',
     'unit_of_measurement': None,
@@ -394,38 +240,16 @@
   })
 # ---
 # name: test_sensor_snapshots[sensor.cellarion_collection_health_score-entry]
-  EntityRegistryEntrySnapshot({
-    'aliases': set({
-    }),
-    'area_id': None,
+  dict({
     'capabilities': dict({
       'state_class': <SensorStateClass.MEASUREMENT: 'measurement'>,
     }),
-    'config_entry_id': <ANY>,
-    'config_subentry_id': <ANY>,
     'device_class': None,
-    'device_id': <ANY>,
     'disabled_by': None,
-    'domain': 'sensor',
     'entity_category': None,
-    'entity_id': 'sensor.cellarion_collection_health_score',
     'has_entity_name': True,
-    'hidden_by': None,
-    'icon': None,
-    'id': <ANY>,
-    'labels': set({
-    }),
-    'name': None,
-    'object_id_base': 'Collection health score',
-    'options': dict({
-    }),
     'original_device_class': None,
-    'original_icon': None,
     'original_name': 'Collection health score',
-    'platform': 'cellarion',
-    'previous_unique_id': None,
-    'suggested_object_id': None,
-    'supported_features': 0,
     'translation_key': 'health_score',
     'unique_id': 'cellarion-test-entry_health_score',
     'unit_of_measurement': None,
@@ -447,38 +271,16 @@
   })
 # ---
 # name: test_sensor_snapshots[sensor.cellarion_collection_value-entry]
-  EntityRegistryEntrySnapshot({
-    'aliases': set({
-    }),
-    'area_id': None,
+  dict({
     'capabilities': dict({
       'state_class': <SensorStateClass.TOTAL: 'total'>,
     }),
-    'config_entry_id': <ANY>,
-    'config_subentry_id': <ANY>,
     'device_class': None,
-    'device_id': <ANY>,
     'disabled_by': None,
-    'domain': 'sensor',
     'entity_category': None,
-    'entity_id': 'sensor.cellarion_collection_value',
     'has_entity_name': True,
-    'hidden_by': None,
-    'icon': None,
-    'id': <ANY>,
-    'labels': set({
-    }),
-    'name': None,
-    'object_id_base': 'Collection value',
-    'options': dict({
-    }),
     'original_device_class': <SensorDeviceClass.MONETARY: 'monetary'>,
-    'original_icon': None,
     'original_name': 'Collection value',
-    'platform': 'cellarion',
-    'previous_unique_id': None,
-    'suggested_object_id': None,
-    'supported_features': 0,
     'translation_key': 'collection_value',
     'unique_id': 'cellarion-test-entry_collection_value',
     'unit_of_measurement': 'EUR',
@@ -503,38 +305,16 @@
   })
 # ---
 # name: test_sensor_snapshots[sensor.cellarion_consumed_bottles-entry]
-  EntityRegistryEntrySnapshot({
-    'aliases': set({
-    }),
-    'area_id': None,
+  dict({
     'capabilities': dict({
       'state_class': <SensorStateClass.TOTAL: 'total'>,
     }),
-    'config_entry_id': <ANY>,
-    'config_subentry_id': <ANY>,
     'device_class': None,
-    'device_id': <ANY>,
     'disabled_by': None,
-    'domain': 'sensor',
     'entity_category': <EntityCategory.DIAGNOSTIC: 'diagnostic'>,
-    'entity_id': 'sensor.cellarion_consumed_bottles',
     'has_entity_name': True,
-    'hidden_by': None,
-    'icon': None,
-    'id': <ANY>,
-    'labels': set({
-    }),
-    'name': None,
-    'object_id_base': 'Consumed bottles',
-    'options': dict({
-    }),
     'original_device_class': None,
-    'original_icon': None,
     'original_name': 'Consumed bottles',
-    'platform': 'cellarion',
-    'previous_unique_id': None,
-    'suggested_object_id': None,
-    'supported_features': 0,
     'translation_key': 'consumed_bottles',
     'unique_id': 'cellarion-test-entry_consumed_bottles',
     'unit_of_measurement': None,
@@ -555,38 +335,16 @@
   })
 # ---
 # name: test_sensor_snapshots[sensor.cellarion_countries-entry]
-  EntityRegistryEntrySnapshot({
-    'aliases': set({
-    }),
-    'area_id': None,
+  dict({
     'capabilities': dict({
       'state_class': <SensorStateClass.MEASUREMENT: 'measurement'>,
     }),
-    'config_entry_id': <ANY>,
-    'config_subentry_id': <ANY>,
     'device_class': None,
-    'device_id': <ANY>,
     'disabled_by': None,
-    'domain': 'sensor',
     'entity_category': None,
-    'entity_id': 'sensor.cellarion_countries',
     'has_entity_name': True,
-    'hidden_by': None,
-    'icon': None,
-    'id': <ANY>,
-    'labels': set({
-    }),
-    'name': None,
-    'object_id_base': 'Countries',
-    'options': dict({
-    }),
     'original_device_class': None,
-    'original_icon': None,
     'original_name': 'Countries',
-    'platform': 'cellarion',
-    'previous_unique_id': None,
-    'suggested_object_id': None,
-    'supported_features': 0,
     'translation_key': 'countries',
     'unique_id': 'cellarion-test-entry_countries',
     'unit_of_measurement': None,
@@ -613,38 +371,16 @@
   })
 # ---
 # name: test_sensor_snapshots[sensor.cellarion_intake_per_year-entry]
-  EntityRegistryEntrySnapshot({
-    'aliases': set({
-    }),
-    'area_id': None,
+  dict({
     'capabilities': dict({
       'state_class': <SensorStateClass.MEASUREMENT: 'measurement'>,
     }),
-    'config_entry_id': <ANY>,
-    'config_subentry_id': <ANY>,
     'device_class': None,
-    'device_id': <ANY>,
     'disabled_by': None,
-    'domain': 'sensor',
     'entity_category': <EntityCategory.DIAGNOSTIC: 'diagnostic'>,
-    'entity_id': 'sensor.cellarion_intake_per_year',
     'has_entity_name': True,
-    'hidden_by': None,
-    'icon': None,
-    'id': <ANY>,
-    'labels': set({
-    }),
-    'name': None,
-    'object_id_base': 'Intake per year',
-    'options': dict({
-    }),
     'original_device_class': None,
-    'original_icon': None,
     'original_name': 'Intake per year',
-    'platform': 'cellarion',
-    'previous_unique_id': None,
-    'suggested_object_id': None,
-    'supported_features': 0,
     'translation_key': 'intake_per_year',
     'unique_id': 'cellarion-test-entry_intake_per_year',
     'unit_of_measurement': None,
@@ -665,36 +401,14 @@
   })
 # ---
 # name: test_sensor_snapshots[sensor.cellarion_newest_vintage-entry]
-  EntityRegistryEntrySnapshot({
-    'aliases': set({
-    }),
-    'area_id': None,
+  dict({
     'capabilities': None,
-    'config_entry_id': <ANY>,
-    'config_subentry_id': <ANY>,
     'device_class': None,
-    'device_id': <ANY>,
     'disabled_by': None,
-    'domain': 'sensor',
     'entity_category': None,
-    'entity_id': 'sensor.cellarion_newest_vintage',
     'has_entity_name': True,
-    'hidden_by': None,
-    'icon': None,
-    'id': <ANY>,
-    'labels': set({
-    }),
-    'name': None,
-    'object_id_base': 'Newest vintage',
-    'options': dict({
-    }),
     'original_device_class': None,
-    'original_icon': None,
     'original_name': 'Newest vintage',
-    'platform': 'cellarion',
-    'previous_unique_id': None,
-    'suggested_object_id': None,
-    'supported_features': 0,
     'translation_key': 'newest_vintage',
     'unique_id': 'cellarion-test-entry_newest_vintage',
     'unit_of_measurement': None,
@@ -714,36 +428,14 @@
   })
 # ---
 # name: test_sensor_snapshots[sensor.cellarion_oldest_vintage-entry]
-  EntityRegistryEntrySnapshot({
-    'aliases': set({
-    }),
-    'area_id': None,
+  dict({
     'capabilities': None,
-    'config_entry_id': <ANY>,
-    'config_subentry_id': <ANY>,
     'device_class': None,
-    'device_id': <ANY>,
     'disabled_by': None,
-    'domain': 'sensor',
     'entity_category': None,
-    'entity_id': 'sensor.cellarion_oldest_vintage',
     'has_entity_name': True,
-    'hidden_by': None,
-    'icon': None,
-    'id': <ANY>,
-    'labels': set({
-    }),
-    'name': None,
-    'object_id_base': 'Oldest vintage',
-    'options': dict({
-    }),
     'original_device_class': None,
-    'original_icon': None,
     'original_name': 'Oldest vintage',
-    'platform': 'cellarion',
-    'previous_unique_id': None,
-    'suggested_object_id': None,
-    'supported_features': 0,
     'translation_key': 'oldest_vintage',
     'unique_id': 'cellarion-test-entry_oldest_vintage',
     'unit_of_measurement': None,
@@ -763,38 +455,16 @@
   })
 # ---
 # name: test_sensor_snapshots[sensor.cellarion_runway_years-entry]
-  EntityRegistryEntrySnapshot({
-    'aliases': set({
-    }),
-    'area_id': None,
+  dict({
     'capabilities': dict({
       'state_class': <SensorStateClass.MEASUREMENT: 'measurement'>,
     }),
-    'config_entry_id': <ANY>,
-    'config_subentry_id': <ANY>,
     'device_class': None,
-    'device_id': <ANY>,
     'disabled_by': None,
-    'domain': 'sensor',
     'entity_category': <EntityCategory.DIAGNOSTIC: 'diagnostic'>,
-    'entity_id': 'sensor.cellarion_runway_years',
     'has_entity_name': True,
-    'hidden_by': None,
-    'icon': None,
-    'id': <ANY>,
-    'labels': set({
-    }),
-    'name': None,
-    'object_id_base': 'Runway (years)',
-    'options': dict({
-    }),
     'original_device_class': None,
-    'original_icon': None,
     'original_name': 'Runway (years)',
-    'platform': 'cellarion',
-    'previous_unique_id': None,
-    'suggested_object_id': None,
-    'supported_features': 0,
     'translation_key': 'runway_years',
     'unique_id': 'cellarion-test-entry_runway_years',
     'unit_of_measurement': None,
@@ -815,10 +485,7 @@
   })
 # ---
 # name: test_sensor_snapshots[sensor.cellarion_service_status-entry]
-  EntityRegistryEntrySnapshot({
-    'aliases': set({
-    }),
-    'area_id': None,
+  dict({
     'capabilities': dict({
       'options': list([
         'ok',
@@ -827,31 +494,12 @@
         'unknown',
       ]),
     }),
-    'config_entry_id': <ANY>,
-    'config_subentry_id': <ANY>,
     'device_class': None,
-    'device_id': <ANY>,
     'disabled_by': None,
-    'domain': 'sensor',
     'entity_category': <EntityCategory.DIAGNOSTIC: 'diagnostic'>,
-    'entity_id': 'sensor.cellarion_service_status',
     'has_entity_name': True,
-    'hidden_by': None,
-    'icon': None,
-    'id': <ANY>,
-    'labels': set({
-    }),
-    'name': None,
-    'object_id_base': 'Service status',
-    'options': dict({
-    }),
     'original_device_class': <SensorDeviceClass.ENUM: 'enum'>,
-    'original_icon': None,
     'original_name': 'Service status',
-    'platform': 'cellarion',
-    'previous_unique_id': None,
-    'suggested_object_id': None,
-    'supported_features': 0,
     'translation_key': 'service_health',
     'unique_id': 'cellarion-test-entry_service_health',
     'unit_of_measurement': None,
@@ -879,36 +527,14 @@
   })
 # ---
 # name: test_sensor_snapshots[sensor.cellarion_top_producers-entry]
-  EntityRegistryEntrySnapshot({
-    'aliases': set({
-    }),
-    'area_id': None,
+  dict({
     'capabilities': None,
-    'config_entry_id': <ANY>,
-    'config_subentry_id': <ANY>,
     'device_class': None,
-    'device_id': <ANY>,
     'disabled_by': None,
-    'domain': 'sensor',
     'entity_category': None,
-    'entity_id': 'sensor.cellarion_top_producers',
     'has_entity_name': True,
-    'hidden_by': None,
-    'icon': None,
-    'id': <ANY>,
-    'labels': set({
-    }),
-    'name': None,
-    'object_id_base': 'Top producers',
-    'options': dict({
-    }),
     'original_device_class': None,
-    'original_icon': None,
     'original_name': 'Top producers',
-    'platform': 'cellarion',
-    'previous_unique_id': None,
-    'suggested_object_id': None,
-    'supported_features': 0,
     'translation_key': 'top_producers',
     'unique_id': 'cellarion-test-entry_top_producers',
     'unit_of_measurement': None,
@@ -934,38 +560,16 @@
   })
 # ---
 # name: test_sensor_snapshots[sensor.cellarion_total_bottles-entry]
-  EntityRegistryEntrySnapshot({
-    'aliases': set({
-    }),
-    'area_id': None,
+  dict({
     'capabilities': dict({
       'state_class': <SensorStateClass.MEASUREMENT: 'measurement'>,
     }),
-    'config_entry_id': <ANY>,
-    'config_subentry_id': <ANY>,
     'device_class': None,
-    'device_id': <ANY>,
     'disabled_by': None,
-    'domain': 'sensor',
     'entity_category': None,
-    'entity_id': 'sensor.cellarion_total_bottles',
     'has_entity_name': True,
-    'hidden_by': None,
-    'icon': None,
-    'id': <ANY>,
-    'labels': set({
-    }),
-    'name': None,
-    'object_id_base': 'Total bottles',
-    'options': dict({
-    }),
     'original_device_class': None,
-    'original_icon': None,
     'original_name': 'Total bottles',
-    'platform': 'cellarion',
-    'previous_unique_id': None,
-    'suggested_object_id': None,
-    'supported_features': 0,
     'translation_key': 'total_bottles',
     'unique_id': 'cellarion-test-entry_total_bottles',
     'unit_of_measurement': None,
@@ -986,38 +590,16 @@
   })
 # ---
 # name: test_sensor_snapshots[sensor.cellarion_unique_wines-entry]
-  EntityRegistryEntrySnapshot({
-    'aliases': set({
-    }),
-    'area_id': None,
+  dict({
     'capabilities': dict({
       'state_class': <SensorStateClass.MEASUREMENT: 'measurement'>,
     }),
-    'config_entry_id': <ANY>,
-    'config_subentry_id': <ANY>,
     'device_class': None,
-    'device_id': <ANY>,
     'disabled_by': None,
-    'domain': 'sensor',
     'entity_category': None,
-    'entity_id': 'sensor.cellarion_unique_wines',
     'has_entity_name': True,
-    'hidden_by': None,
-    'icon': None,
-    'id': <ANY>,
-    'labels': set({
-    }),
-    'name': None,
-    'object_id_base': 'Unique wines',
-    'options': dict({
-    }),
     'original_device_class': None,
-    'original_icon': None,
     'original_name': 'Unique wines',
-    'platform': 'cellarion',
-    'previous_unique_id': None,
-    'suggested_object_id': None,
-    'supported_features': 0,
     'translation_key': 'unique_wines',
     'unique_id': 'cellarion-test-entry_unique_wines',
     'unit_of_measurement': None,
@@ -1038,38 +620,16 @@
   })
 # ---
 # name: test_sensor_snapshots[sensor.cellarion_unread_notifications-entry]
-  EntityRegistryEntrySnapshot({
-    'aliases': set({
-    }),
-    'area_id': None,
+  dict({
     'capabilities': dict({
       'state_class': <SensorStateClass.MEASUREMENT: 'measurement'>,
     }),
-    'config_entry_id': <ANY>,
-    'config_subentry_id': <ANY>,
     'device_class': None,
-    'device_id': <ANY>,
     'disabled_by': None,
-    'domain': 'sensor',
     'entity_category': None,
-    'entity_id': 'sensor.cellarion_unread_notifications',
     'has_entity_name': True,
-    'hidden_by': None,
-    'icon': None,
-    'id': <ANY>,
-    'labels': set({
-    }),
-    'name': None,
-    'object_id_base': 'Unread notifications',
-    'options': dict({
-    }),
     'original_device_class': None,
-    'original_icon': None,
     'original_name': 'Unread notifications',
-    'platform': 'cellarion',
-    'previous_unique_id': None,
-    'suggested_object_id': None,
-    'supported_features': 0,
     'translation_key': 'unread_notifications',
     'unique_id': 'cellarion-test-entry_unread_notifications',
     'unit_of_measurement': None,
@@ -1090,36 +650,14 @@
   })
 # ---
 # name: test_sensor_snapshots[sensor.cellarion_wine_types-entry]
-  EntityRegistryEntrySnapshot({
-    'aliases': set({
-    }),
-    'area_id': None,
+  dict({
     'capabilities': None,
-    'config_entry_id': <ANY>,
-    'config_subentry_id': <ANY>,
     'device_class': None,
-    'device_id': <ANY>,
     'disabled_by': None,
-    'domain': 'sensor',
     'entity_category': None,
-    'entity_id': 'sensor.cellarion_wine_types',
     'has_entity_name': True,
-    'hidden_by': None,
-    'icon': None,
-    'id': <ANY>,
-    'labels': set({
-    }),
-    'name': None,
-    'object_id_base': 'Wine types',
-    'options': dict({
-    }),
     'original_device_class': None,
-    'original_icon': None,
     'original_name': 'Wine types',
-    'platform': 'cellarion',
-    'previous_unique_id': None,
-    'suggested_object_id': None,
-    'supported_features': 0,
     'translation_key': 'wine_types',
     'unique_id': 'cellarion-test-entry_wine_types',
     'unit_of_measurement': None,
