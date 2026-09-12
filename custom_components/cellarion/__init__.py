@@ -19,14 +19,14 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.loader import async_get_integration
 from homeassistant.util.hass_dict import HassKey
-import voluptuous as vol
-
-from .api import (
-    CellarionApiClient,
+from pycellarion import (
     CellarionApiError,
     CellarionAuthError,
+    CellarionClient,
     CellarionScopeError,
 )
+import voluptuous as vol
+
 from .const import (
     CONF_EMAIL,
     CONF_SCAN_INTERVAL,
@@ -209,7 +209,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CellarionConfigEntry) ->
             translation_domain=DOMAIN, translation_key="password_entry_retired"
         )
 
-    client = CellarionApiClient(
+    client = CellarionClient(
         session=async_get_clientsession(hass),
         url=entry.data[CONF_URL],
         email=entry.data.get(CONF_EMAIL),
@@ -256,7 +256,7 @@ async def async_remove_entry(hass: HomeAssistant, entry: CellarionConfigEntry) -
     ir.async_delete_issue(hass, DOMAIN, push_issue_id(entry.entry_id))
     if not (token := entry.data.get(CONF_TOKEN)):
         return
-    client = CellarionApiClient(
+    client = CellarionClient(
         session=async_get_clientsession(hass), url=entry.data[CONF_URL], token=token
     )
     if await client.revoke_own_token():

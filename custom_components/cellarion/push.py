@@ -21,13 +21,13 @@ import random
 import time
 
 from homeassistant.helpers import issue_registry as ir
-
-from .api import (
+from pycellarion import (
     CellarionApiError,
     CellarionAuthError,
     CellarionPushForbidden,
     CellarionPushNotSupported,
 )
+
 from .const import DOMAIN
 from .coordinator import CellarionCoordinator
 

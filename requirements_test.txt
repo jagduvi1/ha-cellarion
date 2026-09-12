@@ -4,3 +4,4 @@ pytest-homeassistant-custom-component
 pytest-cov
 mypy
 ruff
+pycellarion==0.1.0

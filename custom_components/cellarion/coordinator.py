@@ -13,13 +13,13 @@ from homeassistant.helpers.update_coordinator import (
     DataUpdateCoordinator,
     UpdateFailed,
 )
-
-from .api import (
-    CellarionApiClient,
+from pycellarion import (
     CellarionApiError,
     CellarionAuthError,
+    CellarionClient,
     CellarionScopeError,
 )
+
 from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
@@ -78,7 +78,7 @@ class CellarionCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self,
         hass: HomeAssistant,
         entry: ConfigEntry,
-        client: CellarionApiClient,
+        client: CellarionClient,
         scan_interval: int,
         url: str,
     ) -> None:
