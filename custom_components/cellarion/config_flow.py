@@ -18,15 +18,15 @@ from homeassistant.config_entries import (
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.typing import UNDEFINED
-import voluptuous as vol
-
-from .api import (
-    CellarionApiClient,
+from pycellarion import (
     CellarionApiError,
     CellarionAuthError,
+    CellarionClient,
     CellarionScopeError,
     CellarionTokensNotSupported,
 )
+import voluptuous as vol
+
 from .const import (
     CONF_ACCOUNT_ID,
     CONF_EMAIL,
@@ -88,7 +88,7 @@ async def _validate_token(
     account_id is the identity to verify against on reauth (None when the
     server/token can't provide one).
     """
-    client = CellarionApiClient(async_get_clientsession(hass), url, token=token)
+    client = CellarionClient(async_get_clientsession(hass), url, token=token)
     try:
         await client.get_stats_overview()
     except CellarionScopeError:
@@ -253,9 +253,7 @@ class CellarionConfigFlow(ConfigFlow, domain=DOMAIN):
 
                 data: dict[str, Any] | None = None
                 account_id: str | None = None
-                client = CellarionApiClient(
-                    async_get_clientsession(self.hass), url, email, password
-                )
+                client = CellarionClient(async_get_clientsession(self.hass), url, email, password)
                 try:
                     await client.authenticate()
                     # The JWT from authenticate() can read the identity endpoint

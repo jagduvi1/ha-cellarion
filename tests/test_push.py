@@ -9,15 +9,15 @@ from unittest.mock import AsyncMock
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import issue_registry as ir
-import pytest
-
-from custom_components.cellarion import push
-from custom_components.cellarion.api import (
+from pycellarion import (
     CellarionApiError,
     CellarionAuthError,
     CellarionPushForbidden,
     CellarionPushNotSupported,
 )
+import pytest
+
+from custom_components.cellarion import push
 from custom_components.cellarion.const import DOMAIN
 from custom_components.cellarion.push import (
     PUSH_POLL_INTERVAL,
