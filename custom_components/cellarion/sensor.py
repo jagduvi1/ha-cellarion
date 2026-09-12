@@ -20,7 +20,7 @@ from .coordinator import HEALTH_STATES, CellarionCoordinator
 from .entity import CellarionEntity
 
 if TYPE_CHECKING:
-    from . import CellarionConfigEntry
+    from .coordinator import CellarionConfigEntry
 
 # Read-only coordinator entities — no request throttling needed
 PARALLEL_UPDATES = 0
