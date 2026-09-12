@@ -41,9 +41,21 @@ def test_export_produces_a_core_layout(tmp_path: Path, stage: str) -> None:
     assert "async_register_card" not in init
 
     manifest = json.loads((comp / "manifest.json").read_text(encoding="utf-8"))
-    assert "version" not in manifest
+    assert "version" not in manifest and "issue_tracker" not in manifest
+    assert "dependencies" not in manifest and "after_dependencies" not in manifest
     assert manifest["requirements"] == ["pycellarion==0.1.0"]
+    assert manifest["loggers"] == ["pycellarion"]
+    assert manifest["documentation"] == "https://www.home-assistant.io/integrations/cellarion"
+    assert manifest["quality_scale"] == ("bronze" if stage == "minimal" else "platinum")
     assert list(manifest)[:2] == ["domain", "name"]
+
+    scale = (comp / "quality_scale.yaml").read_text(encoding="utf-8")
+    if stage == "minimal":
+        assert "  diagnostics: todo" in scale and "  repair-issues: todo" in scale
+        assert "  action-setup:\n    status: exempt" in scale
+        assert "  action-setup: done" not in scale
+    else:
+        assert "  diagnostics: done" in scale and "  action-setup: done" in scale
 
     strings = json.loads((comp / "strings.json").read_text(encoding="utf-8"))
     if stage == "minimal":
@@ -61,7 +73,7 @@ def test_export_produces_a_core_layout(tmp_path: Path, stage: str) -> None:
 
     test_names = {p.name for p in tests.iterdir()}
     assert "conftest.py" in test_names and "test_config_flow.py" in test_names
-    assert "test_export_core.py" in test_names  # harmless; core reviewers will drop it
+    assert "test_export_core.py" not in test_names  # about this repo, not the integration
     conftest = (tests / "conftest.py").read_text(encoding="utf-8")
     assert "custom_components" not in conftest
     assert "from tests.common import MockConfigEntry" in conftest

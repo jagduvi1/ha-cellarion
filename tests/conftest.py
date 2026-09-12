@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Generator
+from unittest.mock import patch
+
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -12,6 +15,16 @@ from custom_components.cellarion.const import DOMAIN
 def auto_enable_custom_integrations(enable_custom_integrations):
     """Allow loading the custom integration in every test."""
     yield
+
+
+@pytest.fixture
+def entity_registry_enabled_by_default() -> Generator[None]:
+    """Enable entities that are disabled by default (same fixture as core's)."""
+    with patch(
+        "homeassistant.helpers.entity.Entity.entity_registry_enabled_default",
+        return_value=True,
+    ):
+        yield
 
 
 BASE_URL = "http://cellarion.local"
@@ -152,6 +165,7 @@ def token_entry() -> MockConfigEntry:
     """A config entry authenticated with an API token."""
     return MockConfigEntry(
         domain=DOMAIN,
+        entry_id="cellarion-test-entry",
         title="Cellarion (cellarion.local)",
         unique_id=f"{BASE_URL}_token_abcdef123456",
         data={"url": BASE_URL, "token": TEST_TOKEN},

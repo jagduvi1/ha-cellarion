@@ -46,6 +46,8 @@ DOMAIN = "cellarion"
 
 # Files that never go to core.
 HACS_ONLY = {"www", "brand", "frontend.py", "__pycache__"}
+# Tests about this repository itself, not about the integration.
+REPO_ONLY_TESTS = {"test_export_core.py"}
 
 # Feature name → (integration modules, test modules, strings.json keys).
 FEATURES: dict[str, tuple[set[str], set[str], set[str]]] = {
@@ -60,6 +62,23 @@ STAGES: dict[str, set[str]] = {
     "minimal": set(),
     # Everything core can take.
     "full": {"services", "push", "diagnostics"},
+}
+
+# The quality-scale tier the manifest claims per stage. A first pull request
+# claims Bronze; the tier is raised in follow-ups as features land.
+STAGE_TIER = {"minimal": "bronze", "full": "platinum"}
+
+# Quality-scale rules that only hold once a feature is present. In a stage
+# without the feature they become "todo" (rules above the claimed tier) or an
+# exemption with a reason (rules inside it).
+FEATURE_RULES: dict[str, dict[str, str]] = {
+    "services": {
+        "action-setup": "exempt: The integration has no actions yet.",
+        "docs-actions": "exempt: The integration has no actions yet.",
+        "action-exceptions": "todo",
+    },
+    "push": {"repair-issues": "todo"},
+    "diagnostics": {"diagnostics": "todo"},
 }
 
 # Exception translation keys that only the services feature raises.
@@ -113,12 +132,39 @@ def prune_unused_imports(text: str) -> str:
     return IMPORT_LINE.sub(repl, text)
 
 
-def export_manifest(text: str) -> str:
+def export_manifest(text: str, stage: str) -> str:
     manifest = json.loads(text)
     manifest.pop("version", None)  # core integrations are versioned with core
+    manifest.pop("issue_tracker", None)  # core issues live in home-assistant/core
+    # The card needed http and lovelace; core ships no card
+    manifest.pop("after_dependencies", None)
+    manifest.pop("dependencies", None)
+    manifest["documentation"] = f"https://www.home-assistant.io/integrations/{DOMAIN}"
+    manifest["loggers"] = ["pycellarion"]
+    manifest["quality_scale"] = STAGE_TIER[stage]
     ordered = {k: manifest[k] for k in ("domain", "name") if k in manifest}
     ordered.update(sorted((k, v) for k, v in manifest.items() if k not in ordered))
     return json.dumps(ordered, indent=2) + "\n"
+
+
+def export_quality_scale(text: str, keep: set[str]) -> str:
+    """Mark rules of excluded features as todo/exempt; leave the rest as is."""
+    for feature, rules in FEATURE_RULES.items():
+        if feature in keep:
+            continue
+        for rule, value in rules.items():
+            if value.startswith("exempt: "):
+                repl = f"  {rule}:\n    status: exempt\n    comment: {value[8:]}"
+            else:
+                repl = f"  {rule}: {value}"
+            text = re.sub(
+                rf"^  {re.escape(rule)}:(?: done| todo|\n(?:    .*\n)+?)(?=\n|$)",
+                repl,
+                text,
+                flags=re.M,
+            )
+            text = re.sub(rf"^  {re.escape(rule)}: done$", repl, text, flags=re.M)
+    return text
 
 
 def export_strings(text: str, keep: set[str]) -> str:
@@ -159,7 +205,9 @@ def export(stage: str, dest: Path) -> tuple[Path, Path]:
         path.mkdir(parents=True)
 
     excluded_modules = set().union(*(FEATURES[f][0] for f in FEATURES if f not in keep)) | HACS_ONLY
-    excluded_tests = set().union(*(FEATURES[f][1] for f in FEATURES if f not in keep))
+    excluded_tests = (
+        set().union(*(FEATURES[f][1] for f in FEATURES if f not in keep)) | REPO_ONLY_TESTS
+    )
 
     for src in sorted(SRC.iterdir()):
         if src.name in excluded_modules or src.name == "translations":
@@ -170,7 +218,9 @@ def export(stage: str, dest: Path) -> tuple[Path, Path]:
             else None
         )
         if src.name == "manifest.json":
-            (comp / src.name).write_text(export_manifest(text or ""), encoding="utf-8")
+            (comp / src.name).write_text(export_manifest(text or "", stage), encoding="utf-8")
+        elif src.name == "quality_scale.yaml":
+            (comp / src.name).write_text(export_quality_scale(text or "", keep), encoding="utf-8")
         elif src.name == "strings.json":
             (comp / src.name).write_text(export_strings(text or "", keep), encoding="utf-8")
         elif src.suffix == ".py":
@@ -179,6 +229,8 @@ def export(stage: str, dest: Path) -> tuple[Path, Path]:
         elif src.is_file():
             shutil.copy2(src, comp / src.name)
 
+    if (TESTS / "snapshots").is_dir():
+        shutil.copytree(TESTS / "snapshots", tests / "snapshots")
     for src in sorted(TESTS.glob("*.py")):
         if src.name in excluded_tests:
             continue
