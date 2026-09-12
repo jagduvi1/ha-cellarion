@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from datetime import timedelta
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
@@ -18,11 +19,13 @@ from custom_components.cellarion.api import (
 )
 from custom_components.cellarion.const import DOMAIN
 from custom_components.cellarion.push import (
-    PUSH_FORBIDDEN_ISSUE,
     PUSH_POLL_INTERVAL,
     RECONNECT_MIN_SECONDS,
     async_push_listener,
+    push_issue_id,
 )
+
+ENTRY_ID = "entry-one"
 
 
 class FakeClient:
@@ -44,6 +47,7 @@ class FakeCoordinator:
     def __init__(self, hass: HomeAssistant, client) -> None:
         self.hass = hass
         self.client = client
+        self.config_entry = SimpleNamespace(entry_id=ENTRY_ID)
         self.update_interval = timedelta(minutes=30)
         self.async_request_refresh = AsyncMock()
         self.interval_history: list[timedelta] = []
@@ -98,7 +102,9 @@ async def test_forbidden_creates_repair_issue(hass: HomeAssistant) -> None:
     assert task.done()
 
     registry = ir.async_get(hass)
-    assert registry.async_get_issue(DOMAIN, PUSH_FORBIDDEN_ISSUE) is not None
+    assert registry.async_get_issue(DOMAIN, push_issue_id(ENTRY_ID)) is not None
+    # Keyed per entry: another account's listener must not see (or clear) it
+    assert registry.async_get_issue(DOMAIN, push_issue_id("other")) is None
 
 
 class _StopLoop(Exception):
@@ -173,3 +179,20 @@ async def test_backoff_resets_after_stable_connection(
     assert len(delays) == 2
     # Backoff never grew — both waits stayed at ~the minimum
     assert all(d < RECONNECT_MIN_SECONDS * 2 for d in delays)
+
+
+async def test_unexpected_exception_keeps_listener_alive(
+    hass: HomeAssistant, monkeypatch
+) -> None:
+    """An error the client didn't map must reconnect with backoff, not die."""
+    delays: list[float] = []
+    monkeypatch.setattr(push, "asyncio", _FakeAsyncio(delays, stop_after=2))
+    monkeypatch.setattr(push, "time", _FakeClock(step=1.0))
+
+    coordinator = FakeCoordinator(hass, FakeClient(exc=RuntimeError("boom")))
+    # Reaching the second sleep proves the loop survived the first failure
+    with pytest.raises(_StopLoop):
+        await async_push_listener(coordinator)
+
+    assert len(delays) == 2
+    assert delays[0] >= RECONNECT_MIN_SECONDS

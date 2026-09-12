@@ -6,6 +6,7 @@ import logging
 from datetime import timedelta
 from typing import Any
 
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import (
@@ -24,23 +25,34 @@ from .const import DOMAIN
 _LOGGER = logging.getLogger(__name__)
 
 
+def _as_dict(value: Any) -> dict[str, Any]:
+    """Return a dict for a payload section that may be missing or null."""
+    return value if isinstance(value, dict) else {}
+
+
+def _as_list(value: Any) -> list[Any]:
+    """Return a list for a payload section that may be missing or null."""
+    return value if isinstance(value, list) else []
+
+
 def _parse_peak_bottles(peak_data: dict[str, Any]) -> list[dict[str, Any]]:
     """Shape the peak-bottle payload into the sensor's attribute list.
 
     Kept small and pure so the caller can treat any error (missing keys,
     unexpected types) as "no peak data" without failing the whole update.
     """
-    peak_items = peak_data.get("bottles", {}).get("items", [])
+    peak_items = _as_list(_as_dict(peak_data.get("bottles")).get("items"))
     return sorted(
         (
             {
                 "id": b.get("_id"),
-                "name": (b.get("wineDefinition") or {}).get("name", "Unknown"),
-                "producer": (b.get("wineDefinition") or {}).get("producer", ""),
+                "name": _as_dict(b.get("wineDefinition")).get("name", "Unknown"),
+                "producer": _as_dict(b.get("wineDefinition")).get("producer", ""),
                 "vintage": b.get("vintage") or "NV",
                 "drink_to": b.get("drinkTo"),
             }
             for b in peak_items
+            if isinstance(b, dict)
         ),
         # Drink first what leaves its window first; None (unknown) sorts last
         key=lambda x: (x["drink_to"] is None, x["drink_to"]),
@@ -50,9 +62,12 @@ def _parse_peak_bottles(peak_data: dict[str, Any]) -> list[dict[str, Any]]:
 class CellarionCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     """Coordinator that polls the Cellarion API."""
 
+    config_entry: ConfigEntry
+
     def __init__(
         self,
         hass: HomeAssistant,
+        entry: ConfigEntry,
         client: CellarionApiClient,
         scan_interval: int,
         url: str,
@@ -60,6 +75,7 @@ class CellarionCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         super().__init__(
             hass,
             _LOGGER,
+            config_entry=entry,
             name="Cellarion",
             update_interval=timedelta(seconds=scan_interval),
         )
@@ -109,25 +125,24 @@ class CellarionCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 translation_placeholders={"error": str(err)},
             ) from err
 
-        stats = stats_data.get("stats", {})
-        overview = stats.get("overview", {})
-        maturity = stats.get("maturity", {})
-        pace = stats.get("pace", {})
+        # Every section is normalised so a null or missing block from the
+        # server degrades to "no data" instead of failing the state write.
+        stats = _as_dict(stats_data.get("stats"))
 
         return {
-            "overview": overview,
-            "maturity": maturity,
-            "pace": pace,
-            "cellar_breakdown": stats.get("cellarBreakdown", []),
-            "by_type": stats.get("byType", {}),
-            "by_country": stats.get("byCountry", []),
-            "top_producers": stats.get("topProducers", []),
-            "urgency_ladder": stats.get("urgencyLadder", []),
-            "cellars": cellars_data.get("cellars", []),
-            "cellar_count": cellars_data.get("count", 0),
-            "notifications": notifications_data.get("notifications", []),
-            "unread_count": notifications_data.get("unreadCount", 0),
-            "health": health_data.get("status", "unknown"),
+            "overview": _as_dict(stats.get("overview")),
+            "maturity": _as_dict(stats.get("maturity")),
+            "pace": _as_dict(stats.get("pace")),
+            "cellar_breakdown": _as_list(stats.get("cellarBreakdown")),
+            "by_type": _as_dict(stats.get("byType")),
+            "by_country": _as_list(stats.get("byCountry")),
+            "top_producers": _as_list(stats.get("topProducers")),
+            "urgency_ladder": _as_list(stats.get("urgencyLadder")),
+            "cellars": _as_list(cellars_data.get("cellars")),
+            "cellar_count": cellars_data.get("count") or 0,
+            "notifications": _as_list(notifications_data.get("notifications")),
+            "unread_count": notifications_data.get("unreadCount") or 0,
+            "health": health_data.get("status") or "unknown",
             "instance_url": self.url,
             "peak_bottles": peak_bottles,
         }

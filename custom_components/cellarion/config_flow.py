@@ -11,22 +11,14 @@ import voluptuous as vol
 
 from homeassistant.config_entries import (
     SOURCE_REAUTH,
+    SOURCE_RECONFIGURE,
     ConfigEntry,
     ConfigFlow,
+    ConfigFlowResult,
     OptionsFlow,
 )
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-
-try:  # HA 2024.4+
-    from homeassistant.config_entries import ConfigFlowResult
-except ImportError:  # pragma: no cover — older HA
-    from homeassistant.data_entry_flow import FlowResult as ConfigFlowResult
-
-try:  # HA 2024.4+
-    from homeassistant.config_entries import SOURCE_RECONFIGURE
-except ImportError:  # pragma: no cover — older HA
-    SOURCE_RECONFIGURE = "reconfigure"
 
 from .api import (
     CellarionApiClient,
@@ -58,12 +50,33 @@ def _normalize_url(raw: str) -> str | None:
 
     Requires an http(s) scheme and a host — rejects typos like a bare host or
     an accidental "javascript:"/"file:" paste before any credential is sent.
+    Credentials embedded in the URL (https://user:pass@host) are refused too:
+    aiohttp cannot combine them with the bearer header, and they would end up
+    in logs.
     """
     url = raw.strip().rstrip("/")
     parsed = urlparse(url)
     if parsed.scheme not in ("http", "https") or not parsed.netloc:
         return None
+    if parsed.username is not None or parsed.password is not None:
+        return None
     return url
+
+
+def _host_title(url: str) -> str:
+    """Entry title for a token-based entry: the instance host."""
+    return f"Cellarion ({urlparse(url).netloc or url})"
+
+
+def _unique_id(url: str, account_id: str | None, fallback: str) -> str:
+    """Identity of an entry: the account on that instance.
+
+    Prefers the server's account id so the same account can't be added twice
+    with different tokens or via token and password. Older servers that
+    can't say who the credential belongs to fall back to a credential-based
+    id (email, or a hash of the token).
+    """
+    return f"{url}_{account_id}" if account_id else f"{url}_{fallback}"
 
 
 async def _validate_token(
@@ -114,12 +127,18 @@ class CellarionConfigFlow(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
-    def __init__(self) -> None:
-        self._entry: ConfigEntry | None = None  # reauth/reconfigure target
-
     @property
     def _is_reauth(self) -> bool:
         return self.source == SOURCE_REAUTH
+
+    @property
+    def _entry(self) -> ConfigEntry | None:
+        """The entry being re-authenticated or reconfigured, if any."""
+        if self.source == SOURCE_REAUTH:
+            return self._get_reauth_entry()
+        if self.source == SOURCE_RECONFIGURE:
+            return self._get_reconfigure_entry()
+        return None
 
     # ── Entry points ─────────────────────────────────────────────────
 
@@ -135,9 +154,6 @@ class CellarionConfigFlow(ConfigFlow, domain=DOMAIN):
         self, entry_data: dict[str, Any]
     ) -> ConfigFlowResult:
         """Handle reauth when credentials stop working."""
-        self._entry = self.hass.config_entries.async_get_entry(
-            self.context["entry_id"]
-        )
         return await self.async_step_reauth_confirm()
 
     async def async_step_reauth_confirm(
@@ -156,9 +172,6 @@ class CellarionConfigFlow(ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Reconfigure the entry (change URL or credentials)."""
-        self._entry = self.hass.config_entries.async_get_entry(
-            self.context["entry_id"]
-        )
         return self.async_show_menu(
             step_id="reconfigure", menu_options=["token", "password"]
         )
@@ -186,30 +199,33 @@ class CellarionConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "invalid_url"
             else:
                 error, account_id = await _validate_token(self.hass, url, token)
+                token_hash = hashlib.sha256(token.encode()).hexdigest()[:12]
+                unique_id = _unique_id(url, account_id, f"token_{token_hash}")
                 if error:
                     errors["base"] = error
                 elif _account_mismatch(entry, account_id):
                     errors["base"] = "account_mismatch"
                 elif entry:
                     return await self._async_finish_existing(
+                        entry,
                         {
                             CONF_URL: url,
                             CONF_EMAIL: entry.data.get(CONF_EMAIL),
                             CONF_TOKEN: token,
                             CONF_ACCOUNT_ID: account_id
                             or entry.data.get(CONF_ACCOUNT_ID),
-                        }
+                        },
+                        unique_id=unique_id if account_id else None,
+                        title=_host_title(url) if not entry.data.get(CONF_EMAIL) else None,
                     )
                 else:
-                    token_id = hashlib.sha256(token.encode()).hexdigest()[:12]
-                    await self.async_set_unique_id(f"{url}_token_{token_id}")
+                    await self.async_set_unique_id(unique_id)
                     self._abort_if_unique_id_configured()
-                    host = urlparse(url).netloc or url
                     data = {CONF_URL: url, CONF_TOKEN: token}
                     if account_id:
                         data[CONF_ACCOUNT_ID] = account_id
                     return self.async_create_entry(
-                        title=f"Cellarion ({host})",
+                        title=_host_title(url),
                         data=data,
                         options={CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL},
                     )
@@ -247,12 +263,8 @@ class CellarionConfigFlow(ConfigFlow, domain=DOMAIN):
             if url is None:
                 errors["base"] = "invalid_url"
             else:
-                email = user_input[CONF_EMAIL]
+                email = user_input[CONF_EMAIL].strip()
                 password = user_input[CONF_PASSWORD]
-
-                if not entry:
-                    await self.async_set_unique_id(f"{url}_{email}")
-                    self._abort_if_unique_id_configured()
 
                 data: dict[str, Any] | None = None
                 account_id: str | None = None
@@ -298,11 +310,19 @@ class CellarionConfigFlow(ConfigFlow, domain=DOMAIN):
                     errors["base"] = "unknown"
 
                 if data is not None:
+                    unique_id = _unique_id(url, account_id, email)
                     if _account_mismatch(entry, account_id):
                         errors["base"] = "account_mismatch"
                     elif entry:
-                        return await self._async_finish_existing(data)
+                        return await self._async_finish_existing(
+                            entry,
+                            data,
+                            unique_id=unique_id if account_id else None,
+                            title=f"Cellarion ({email})",
+                        )
                     else:
+                        await self.async_set_unique_id(unique_id)
+                        self._abort_if_unique_id_configured()
                         return self.async_create_entry(
                             title=f"Cellarion ({email})",
                             data=data,
@@ -337,35 +357,41 @@ class CellarionConfigFlow(ConfigFlow, domain=DOMAIN):
     # ── Helpers ──────────────────────────────────────────────────────
 
     async def _async_finish_existing(
-        self, data: dict[str, Any]
+        self,
+        entry: ConfigEntry,
+        data: dict[str, Any],
+        *,
+        unique_id: str | None,
+        title: str | None,
     ) -> ConfigFlowResult:
-        """Store new credentials on the existing entry and reload."""
-        entry = self._entry
-        assert entry is not None
-        self.hass.config_entries.async_update_entry(
-            entry, data={k: v for k, v in data.items() if v is not None}
-        )
-        await self.hass.config_entries.async_reload(entry.entry_id)
-        return self.async_abort(
-            reason="reauth_successful"
-            if self._is_reauth
-            else "reconfigure_successful"
+        """Store new credentials on the existing entry and reload.
+
+        On reconfigure the identity may change (new URL, or a server that
+        now reports an account id). The new identity must not collide with
+        another entry; the entry's own id is of course allowed.
+        """
+        if unique_id and unique_id != entry.unique_id:
+            other = self.hass.config_entries.async_entry_for_domain_unique_id(
+                DOMAIN, unique_id
+            )
+            if other and other.entry_id != entry.entry_id:
+                return self.async_abort(reason="already_configured")
+        return self.async_update_reload_and_abort(
+            entry,
+            data={k: v for k, v in data.items() if v is not None},
+            **({"unique_id": unique_id} if unique_id else {}),
+            **({"title": title} if title else {}),
         )
 
     @staticmethod
     @callback
     def async_get_options_flow(config_entry: ConfigEntry) -> CellarionOptionsFlow:
         """Return the options flow handler."""
-        return CellarionOptionsFlow(config_entry)
+        return CellarionOptionsFlow()
 
 
 class CellarionOptionsFlow(OptionsFlow):
     """Handle options for Cellarion."""
-
-    def __init__(self, config_entry: ConfigEntry) -> None:
-        # Assigning self.config_entry is deprecated (removed in HA 2025.12);
-        # keep our own reference so this works on every HA version.
-        self._entry = config_entry
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -380,7 +406,7 @@ class CellarionOptionsFlow(OptionsFlow):
                 {
                     vol.Required(
                         CONF_SCAN_INTERVAL,
-                        default=self._entry.options.get(
+                        default=self.config_entry.options.get(
                             CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
                         ),
                     ): vol.All(

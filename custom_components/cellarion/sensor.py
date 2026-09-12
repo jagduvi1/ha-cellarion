@@ -34,7 +34,7 @@ class CellarionSensorDescription(SensorEntityDescription):
     extra_attrs_fn: Callable[[dict[str, Any]], dict[str, Any]] | None = None
 
 
-def _get_overview(data: dict, key: str, default: Any = None) -> Any:
+def _get_overview(data: dict[str, Any], key: str, default: Any = None) -> Any:
     return data.get("overview", {}).get(key, default)
 
 
@@ -151,7 +151,9 @@ SENSOR_DESCRIPTIONS: tuple[CellarionSensorDescription, ...] = (
     CellarionSensorDescription(
         key="consumed_bottles",
         translation_key="consumed_bottles",
-        state_class=SensorStateClass.TOTAL_INCREASING,
+        # TOTAL, not TOTAL_INCREASING: restoring a bottle lowers the count,
+        # which long-term statistics would otherwise record as a meter reset
+        state_class=SensorStateClass.TOTAL,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: _get_overview(d, "totalConsumed", 0),
     ),
@@ -285,9 +287,8 @@ class CellarionSensor(CellarionEntity, SensorEntity):
             == SensorDeviceClass.MONETARY
             and self.coordinator.data
         ):
-            return (
-                self.coordinator.data.get("overview", {})
-                .get("currency", "EUR")
+            return str(
+                self.coordinator.data.get("overview", {}).get("currency", "EUR")
             )
         return self.entity_description.native_unit_of_measurement
 

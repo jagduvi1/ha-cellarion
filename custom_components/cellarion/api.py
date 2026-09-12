@@ -3,10 +3,15 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncIterator
+from typing import Any
+from urllib.parse import quote
 
 import aiohttp
 
 _LOGGER = logging.getLogger(__name__)
+
+JsonDict = dict[str, Any]
 
 
 class CellarionApiError(Exception):
@@ -31,6 +36,20 @@ class CellarionScopeError(CellarionApiError):
 
 class CellarionTokensNotSupported(CellarionApiError):
     """The server does not support personal API tokens."""
+
+
+async def _read_json(resp: aiohttp.ClientResponse, what: str) -> JsonDict:
+    """Decode a JSON object body, mapping a non-JSON answer to an API error.
+
+    A reverse proxy or SPA fallback can answer a 200 with an HTML page; that
+    must surface as a normal (retryable) API error, not an unhandled
+    exception that marks the whole update as "unexpected".
+    """
+    try:
+        data = await resp.json()
+    except (aiohttp.ClientError, ValueError) as err:
+        raise CellarionApiError(f"{what} response was not JSON") from err
+    return data if isinstance(data, dict) else {}
 
 
 class CellarionApiClient:
@@ -68,11 +87,18 @@ class CellarionApiClient:
                 # against both username and email.
                 json={"username": self._email, "password": self._password},
                 timeout=aiohttp.ClientTimeout(total=15),
+                # Never re-send the password body to a redirect target
+                allow_redirects=False,
             )
         except (aiohttp.ClientError, TimeoutError) as err:
             _LOGGER.error("Connection to %s failed: %s", login_url, err)
             raise CellarionApiError(f"Connection failed: {err}") from err
 
+        if 300 <= resp.status < 400:
+            raise CellarionApiError(
+                f"Login was redirected (status {resp.status}); "
+                "configure the final instance URL"
+            )
         if resp.status in (400, 401):
             raise CellarionAuthError("Invalid email or password")
         if resp.status == 403:
@@ -82,14 +108,14 @@ class CellarionApiClient:
         if resp.status != 200:
             raise CellarionApiError(f"Login failed with status {resp.status}")
 
-        data = await resp.json()
+        data = await _read_json(resp, "Login")
         self._token = data.get("token")
         if not self._token:
             raise CellarionApiError("No token in login response")
         return True
 
     async def _send(
-        self, method: str, path: str, json: dict | None
+        self, method: str, path: str, json: JsonDict | None
     ) -> aiohttp.ClientResponse:
         """Issue one request, mapping transport errors to CellarionApiError."""
         try:
@@ -104,8 +130,8 @@ class CellarionApiClient:
             raise CellarionApiError(f"Request failed: {err}") from err
 
     async def _request(
-        self, method: str, path: str, json: dict | None = None
-    ) -> dict:
+        self, method: str, path: str, json: JsonDict | None = None
+    ) -> JsonDict:
         """Make an authenticated API request with auto-retry on 401."""
         if not self._token:
             await self.authenticate()
@@ -136,8 +162,8 @@ class CellarionApiClient:
                 detail = ""
                 try:
                     detail = (await resp.json()).get("error", "")
-                except Exception:  # noqa: BLE001 — best-effort error body
-                    pass
+                except Exception:  # best-effort error body
+                    detail = ""
                 raise CellarionApiError(
                     f"{method} {path} returned status {resp.status}"
                     + (f": {detail}" if detail else "")
@@ -148,18 +174,19 @@ class CellarionApiClient:
             if resp.status == 204 or getattr(resp, "content_length", None) == 0:
                 return {}
             try:
-                return await resp.json()
+                data = await resp.json()
             except (aiohttp.ClientError, ValueError):
                 # No/!JSON body on a success status — nothing to return
                 return {}
+            return data if isinstance(data, dict) else {}
         finally:
             resp.close()
 
-    async def get_stats_overview(self) -> dict:
+    async def get_stats_overview(self) -> JsonDict:
         """Fetch collection statistics."""
         return await self._request("GET", "/api/stats/overview")
 
-    async def get_cellars(self) -> dict:
+    async def get_cellars(self) -> JsonDict:
         """Fetch user's cellars."""
         return await self._request("GET", "/api/cellars")
 
@@ -178,15 +205,12 @@ class CellarionApiClient:
             data = await self._request("GET", "/api/auth/whoami")
         except CellarionApiError:
             return None
-        if not isinstance(data, dict):
-            # A proxy/edge server could answer 200 with a JSON array or scalar
-            return None
         user = data.get("user")
         user = user if isinstance(user, dict) else {}
         account_id = data.get("id") or user.get("id") or user.get("_id")
         return str(account_id) if account_id else None
 
-    async def get_notifications(self) -> dict:
+    async def get_notifications(self) -> JsonDict:
         """Fetch notifications with unread count."""
         return await self._request("GET", "/api/notifications")
 
@@ -211,10 +235,16 @@ class CellarionApiClient:
                     "password": self._password,
                 },
                 timeout=aiohttp.ClientTimeout(total=15),
+                allow_redirects=False,
             )
         except (aiohttp.ClientError, TimeoutError) as err:
             raise CellarionApiError(f"Token creation failed: {err}") from err
 
+        if 300 <= resp.status < 400:
+            raise CellarionApiError(
+                f"Token creation was redirected (status {resp.status}); "
+                "configure the final instance URL"
+            )
         if resp.status in (404, 405, 501):
             raise CellarionTokensNotSupported(
                 "Server does not support API tokens"
@@ -228,16 +258,16 @@ class CellarionApiClient:
                 f"Token creation returned status {resp.status}"
             )
 
-        data = await resp.json()
+        data = await _read_json(resp, "Token creation")
         token = data.get("token")
         if not token:
             raise CellarionApiError("No token in creation response")
-        return token
+        return str(token)
 
-    async def get_peak_bottles(self, limit: int = 10) -> dict:
+    async def get_peak_bottles(self, limit: int = 10) -> JsonDict:
         """Fetch bottles currently in their peak drink window."""
         return await self._request(
-            "GET", f"/api/bottles?maturity=peak&limit={limit}"
+            "GET", f"/api/bottles?maturity=peak&limit={int(limit)}"
         )
 
     async def consume_bottle(
@@ -246,18 +276,20 @@ class CellarionApiClient:
         reason: str = "drank",
         rating: float | None = None,
         note: str | None = None,
-    ) -> dict:
+    ) -> JsonDict:
         """Mark a bottle as consumed (drank/gifted/sold/other)."""
-        body: dict = {"reason": reason}
+        body: JsonDict = {"reason": reason}
         if rating is not None:
             body["rating"] = rating
         if note:
             body["note"] = note
+        # The id is validated upstream; quoting keeps a stray "/", "?" or "#"
+        # from steering the request to another path regardless.
         return await self._request(
-            "POST", f"/api/bottles/{bottle_id}/consume", json=body
+            "POST", f"/api/bottles/{quote(bottle_id, safe='')}/consume", json=body
         )
 
-    async def events_stream(self):
+    async def events_stream(self) -> AsyncIterator[str]:
         """Yield push event names from the server's SSE stream.
 
         Yields the sentinel "_connected" once the stream is open, then one
@@ -334,16 +366,20 @@ class CellarionApiClient:
                     event_name = "message"
         except (aiohttp.ClientError, TimeoutError) as err:
             raise CellarionApiError(f"Push stream read failed: {err}") from err
+        except ValueError as err:
+            # aiohttp raises ValueError for a line over its 64 KiB limit —
+            # a proxy error page mid-stream, not a transport error
+            raise CellarionApiError(f"Push stream sent malformed data: {err}") from err
         finally:
             resp.close()
 
-    async def get_health(self) -> dict:
+    async def get_health(self) -> JsonDict:
         """Fetch service health (no auth required, but we use it anyway)."""
         try:
             resp = await self._session.get(
                 f"{self._url}/api/health",
                 timeout=aiohttp.ClientTimeout(total=10),
             )
-            return await resp.json()
-        except (aiohttp.ClientError, TimeoutError):
+            return await _read_json(resp, "Health")
+        except (aiohttp.ClientError, TimeoutError, CellarionApiError):
             return {"status": "unreachable"}
