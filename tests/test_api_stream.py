@@ -365,3 +365,10 @@ async def test_revoke_own_token_needs_an_api_token() -> None:
     client, session = password_client()
     assert await client.revoke_own_token() is False
     assert session.calls == []
+
+
+async def test_oversized_body_is_refused() -> None:
+    """A response far larger than any real payload is an error, not a read."""
+    client, _ = token_client(FakeResponse(200, {"stats": {}}, content_length=50_000_000))
+    with pytest.raises(CellarionApiError, match="refusing to read"):
+        await client.get_stats_overview()

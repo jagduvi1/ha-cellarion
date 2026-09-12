@@ -3,6 +3,7 @@
 [![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz)
 [![Release](https://img.shields.io/github/v/release/jagduvi1/ha-cellarion)](https://github.com/jagduvi1/ha-cellarion/releases)
 [![Validate](https://github.com/jagduvi1/ha-cellarion/actions/workflows/validate.yml/badge.svg)](https://github.com/jagduvi1/ha-cellarion/actions/workflows/validate.yml)
+[![Quality scale: Platinum](https://img.shields.io/badge/quality%20scale-platinum-8A9BA8.svg)](https://developers.home-assistant.io/docs/core/integration-quality-scale/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 A Home Assistant custom integration for [Cellarion](https://cellarion.app) — the wine cellar management service. Track your collection, drink windows, and cellar value at **[cellarion.app](https://cellarion.app)**, and bring it all into your smart home. (Prefer to run your own? Cellarion can also be self-hosted — the integration works with both.)
@@ -50,8 +51,9 @@ Your wine data stays in your Cellarion account. This integration reads from the 
 1. Go to **Settings** > **Devices & Services** > **Add Integration**
 2. Search for **Cellarion**
 3. Enter the **URL** of your Cellarion instance — `https://cellarion.app`
-   for the hosted service, or the address of your own server — and pick
-   an authentication method:
+   for the hosted service, or the address of your own server (use https
+   unless it is on your own network; over plain http the token travels
+   unencrypted) — and pick an authentication method:
    - **API token (recommended)** — create one in Cellarion under
      **Settings → API tokens** with the `read` and `consume` scopes and
      paste it in. Your password never touches Home Assistant.

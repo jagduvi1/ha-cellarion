@@ -59,42 +59,40 @@ class FakeCoordinator:
         super().__setattr__(name, value)
 
 
-async def _run_listener(coordinator, runtime: float = 0.3) -> None:
-    task = asyncio.create_task(async_push_listener(coordinator))
-    await asyncio.sleep(runtime)
-    task.cancel()
-    with pytest.raises(asyncio.CancelledError):
-        await task
-
-
-async def test_events_trigger_refresh_and_interval(hass: HomeAssistant) -> None:
+async def test_events_trigger_refresh_and_interval(hass: HomeAssistant, monkeypatch) -> None:
     """Connected stream relaxes polling; events trigger refreshes."""
+    delays: list[float] = []
+    monkeypatch.setattr(push, "asyncio", _FakeAsyncio(delays, stop_after=1))
     coordinator = FakeCoordinator(hass, FakeClient(events=("ready", "stats_changed")))
-    await _run_listener(coordinator)
+    with pytest.raises(_StopLoop):
+        await async_push_listener(coordinator)
 
     # ready + stats_changed + post-disconnect catch-up
     assert coordinator.async_request_refresh.await_count == 3
     assert PUSH_POLL_INTERVAL in coordinator.interval_history
-    # Interval restored after the stream dropped
+    # Interval restored after the stream dropped, before the reconnect wait
     assert coordinator.update_interval == timedelta(minutes=30)
+    assert delays[0] >= RECONNECT_MIN_SECONDS
 
 
-async def test_not_supported_falls_back(hass: HomeAssistant) -> None:
+async def test_not_supported_falls_back(hass: HomeAssistant, monkeypatch) -> None:
     """A server without push leaves polling untouched."""
+    delays: list[float] = []
+    monkeypatch.setattr(push, "asyncio", _FakeAsyncio(delays, stop_after=1))
     coordinator = FakeCoordinator(hass, FakeClient(exc=CellarionPushNotSupported("nope")))
-    await _run_listener(coordinator)
+    with pytest.raises(_StopLoop):
+        await async_push_listener(coordinator)
 
     assert coordinator.async_request_refresh.await_count == 0
     assert coordinator.update_interval == timedelta(minutes=30)
+    assert PUSH_POLL_INTERVAL not in coordinator.interval_history
 
 
 async def test_forbidden_creates_repair_issue(hass: HomeAssistant) -> None:
     """A 403 stream creates a repair issue and stops the listener."""
     coordinator = FakeCoordinator(hass, FakeClient(exc=CellarionPushForbidden("no read scope")))
-    task = asyncio.create_task(async_push_listener(coordinator))
-    await asyncio.sleep(0.1)
-    # Listener returned on its own — no cancel needed
-    assert task.done()
+    # Listener returns on its own — no task, no waiting
+    await async_push_listener(coordinator)
 
     registry = ir.async_get(hass)
     assert registry.async_get_issue(DOMAIN, push_issue_id(ENTRY_ID)) is not None
@@ -190,9 +188,7 @@ async def test_unexpected_exception_keeps_listener_alive(hass: HomeAssistant, mo
 async def test_auth_error_stops_listener(hass: HomeAssistant) -> None:
     """Bad credentials end the listener; the polling path owns the reauth."""
     coordinator = FakeCoordinator(hass, FakeClient(exc=CellarionAuthError("no")))
-    task = asyncio.create_task(async_push_listener(coordinator))
-    await asyncio.sleep(0.05)
-    assert task.done() and task.exception() is None
+    await async_push_listener(coordinator)
     assert coordinator.update_interval == timedelta(minutes=30)
 
 

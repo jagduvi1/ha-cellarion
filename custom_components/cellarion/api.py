@@ -13,6 +13,11 @@ _LOGGER = logging.getLogger(__name__)
 
 JsonDict = dict[str, Any]
 
+# Largest response body the client will read. The stats and bottle lists the
+# integration asks for are a few kilobytes; anything past this is a proxy
+# error page or a misbehaving server, not data worth holding in memory.
+MAX_BODY_BYTES = 4 * 1024 * 1024
+
 
 class CellarionApiError(Exception):
     """Base exception for Cellarion API errors."""
@@ -162,8 +167,13 @@ class CellarionApiClient:
 
             # getattr keeps this working against test doubles that don't
             # implement content_length; real aiohttp always provides it.
-            if resp.status == 204 or getattr(resp, "content_length", None) == 0:
+            length = getattr(resp, "content_length", None)
+            if resp.status == 204 or length == 0:
                 return {}
+            if length is not None and length > MAX_BODY_BYTES:
+                raise CellarionApiError(
+                    f"{method} {path} answered with {length} bytes; refusing to read it"
+                )
             try:
                 data = await resp.json()
             except (aiohttp.ClientError, ValueError):
