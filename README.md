@@ -3,7 +3,7 @@
 [![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz)
 [![Release](https://img.shields.io/github/v/release/jagduvi1/ha-cellarion)](https://github.com/jagduvi1/ha-cellarion/releases)
 [![Validate](https://github.com/jagduvi1/ha-cellarion/actions/workflows/validate.yml/badge.svg)](https://github.com/jagduvi1/ha-cellarion/actions/workflows/validate.yml)
-[![Quality scale: Platinum](https://img.shields.io/badge/quality%20scale-platinum-8A9BA8.svg)](https://developers.home-assistant.io/docs/core/integration-quality-scale/)
+[![Quality scale: Platinum (self-assessed)](https://img.shields.io/badge/quality%20scale-platinum%20%28self--assessed%29-8A9BA8.svg)](https://developers.home-assistant.io/docs/core/integration-quality-scale/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 A Home Assistant custom integration for [Cellarion](https://cellarion.app) — the wine cellar management service. Track your collection, drink windows, and cellar value at **[cellarion.app](https://cellarion.app)**, and bring it all into your smart home. (Prefer to run your own? Cellarion can also be self-hosted — the integration works with both.)
@@ -291,6 +291,18 @@ automation:
             You have {{ states('sensor.cellarion_bottles_at_peak') }}
             bottles at their peak. Time to open one!
 ```
+
+## Quality
+
+The integration is maintained against Home Assistant's
+[Integration Quality Scale](https://developers.home-assistant.io/docs/core/integration-quality-scale/)
+and meets every rule of the Platinum tier that applies to a cloud
+service integration: strict typing, an async-only dependency, injected
+web session, per-module test coverage above 95 %, diagnostics, repair
+issues, reauthentication and reconfiguration flows, and full
+translations. Official ratings are only awarded to integrations shipped
+inside Home Assistant itself, so this one is self-assessed; CI enforces
+the checks on every change.
 
 ## Requirements
 
