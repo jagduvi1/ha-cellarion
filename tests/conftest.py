@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import pytest
-
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.cellarion.const import DOMAIN
+
 
 @pytest.fixture(autouse=True)
 def auto_enable_custom_integrations(enable_custom_integrations):
@@ -101,9 +101,7 @@ def mock_cellarion_api(
     check stays dormant. Pass whoami_status=200 to exercise the active path.
     """
     if login_status == 200:
-        aioclient_mock.post(
-            f"{url}/api/auth/login", json={"token": JWT, "user": {}}
-        )
+        aioclient_mock.post(f"{url}/api/auth/login", json={"token": JWT, "user": {}})
     else:
         aioclient_mock.post(
             f"{url}/api/auth/login",
@@ -114,9 +112,7 @@ def mock_cellarion_api(
     if tokens_status == 200:
         aioclient_mock.post(f"{url}/api/tokens", json={"token": NEW_TOKEN})
     else:
-        aioclient_mock.post(
-            f"{url}/api/tokens", status=tokens_status, json={"error": "nope"}
-        )
+        aioclient_mock.post(f"{url}/api/tokens", status=tokens_status, json={"error": "nope"})
 
     if stats_status == 200:
         aioclient_mock.get(f"{url}/api/stats/overview", json=STATS_PAYLOAD)
@@ -127,34 +123,26 @@ def mock_cellarion_api(
             json={"error": "denied"},
         )
 
-    aioclient_mock.get(
-        f"{url}/api/cellars", json={"count": 1, "cellars": [{"name": "Main"}]}
-    )
+    aioclient_mock.get(f"{url}/api/cellars", json={"count": 1, "cellars": [{"name": "Main"}]})
     aioclient_mock.get(
         f"{url}/api/notifications",
         json={"notifications": [], "unreadCount": 2},
     )
-    aioclient_mock.get(
-        f"{url}/api/health", json={"status": "ok", "version": "1.75.0"}
-    )
+    aioclient_mock.get(f"{url}/api/health", json={"status": "ok", "version": "1.75.0"})
     if peak_status == 200:
         aioclient_mock.get(
             f"{url}/api/bottles",
             json=peak_json if peak_json is not None else PEAK_PAYLOAD,
         )
     else:
-        aioclient_mock.get(
-            f"{url}/api/bottles", status=peak_status, json={"error": "no"}
-        )
+        aioclient_mock.get(f"{url}/api/bottles", status=peak_status, json={"error": "no"})
     if whoami_status == 200:
         aioclient_mock.get(
             f"{url}/api/auth/whoami",
             json=whoami_json if whoami_json is not None else {"id": "ACCOUNT-A"},
         )
     else:
-        aioclient_mock.get(
-            f"{url}/api/auth/whoami", status=whoami_status, json={"error": "no"}
-        )
+        aioclient_mock.get(f"{url}/api/auth/whoami", status=whoami_status, json={"error": "no"})
     # No push support in tests — the listener falls back to polling
     aioclient_mock.get(f"{url}/api/events/stream", status=404)
 

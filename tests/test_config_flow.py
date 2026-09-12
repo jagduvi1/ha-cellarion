@@ -5,14 +5,12 @@ from __future__ import annotations
 from unittest.mock import patch
 
 import aiohttp
-import pytest
-import voluptuous as vol
-
 from homeassistant.config_entries import SOURCE_REAUTH, SOURCE_RECONFIGURE, SOURCE_USER
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
-
+import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
+import voluptuous as vol
 
 from custom_components.cellarion.const import DOMAIN
 
@@ -38,9 +36,7 @@ def _token_entry_with_account(account_id: str) -> MockConfigEntry:
 @pytest.fixture(autouse=True)
 def no_setup():
     """Config-flow tests never run full entry setup."""
-    with patch(
-        "custom_components.cellarion.async_setup_entry", return_value=True
-    ):
+    with patch("custom_components.cellarion.async_setup_entry", return_value=True):
         yield
 
 
@@ -49,16 +45,12 @@ async def _menu_to(hass: HomeAssistant, step: str, context=None, data=None):
         DOMAIN, context=context or {"source": SOURCE_USER}, data=data
     )
     assert result["type"] is FlowResultType.MENU
-    return await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"next_step_id": step}
-    )
+    return await hass.config_entries.flow.async_configure(result["flow_id"], {"next_step_id": step})
 
 
 async def test_user_menu(hass: HomeAssistant) -> None:
     """The initial step is a token/password menu."""
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": SOURCE_USER}
-    )
+    result = await hass.config_entries.flow.async_init(DOMAIN, context={"source": SOURCE_USER})
     assert result["type"] is FlowResultType.MENU
     assert set(result["menu_options"]) == {"token", "password"}
 
@@ -96,9 +88,7 @@ async def test_token_flow_errors(
 
 async def test_token_flow_cannot_connect(hass: HomeAssistant, aioclient_mock) -> None:
     """A network error maps to cannot_connect."""
-    aioclient_mock.get(
-        f"{BASE_URL}/api/stats/overview", exc=aiohttp.ClientError("boom")
-    )
+    aioclient_mock.get(f"{BASE_URL}/api/stats/overview", exc=aiohttp.ClientError("boom"))
     result = await _menu_to(hass, "token")
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {"url": BASE_URL, "token": TEST_TOKEN}
@@ -106,9 +96,7 @@ async def test_token_flow_cannot_connect(hass: HomeAssistant, aioclient_mock) ->
     assert result["errors"] == {"base": "cannot_connect"}
 
 
-async def test_password_flow_mints_token(
-    hass: HomeAssistant, aioclient_mock
-) -> None:
+async def test_password_flow_mints_token(hass: HomeAssistant, aioclient_mock) -> None:
     """Email+password mints a scoped token and stores no password."""
     mock_cellarion_api(aioclient_mock)
     result = await _menu_to(hass, "password")
@@ -125,9 +113,7 @@ async def test_password_flow_mints_token(
         "token": NEW_TOKEN,
     }
     # The mint request carried the right scopes
-    mint_call = [
-        c for c in aioclient_mock.mock_calls if str(c[1]).endswith("/api/tokens")
-    ][0]
+    mint_call = next(c for c in aioclient_mock.mock_calls if str(c[1]).endswith("/api/tokens"))
     assert mint_call[2]["scopes"] == ["read", "consume"]
 
 
@@ -146,9 +132,7 @@ async def test_password_flow_old_server_stores_password(
     assert "token" not in result["data"]
 
 
-async def test_password_flow_invalid_auth(
-    hass: HomeAssistant, aioclient_mock
-) -> None:
+async def test_password_flow_invalid_auth(hass: HomeAssistant, aioclient_mock) -> None:
     """A rejected login shows invalid_auth."""
     mock_cellarion_api(aioclient_mock, login_status=401)
     result = await _menu_to(hass, "password")
@@ -190,21 +174,15 @@ async def test_reauth_token(hass: HomeAssistant, aioclient_mock, token_entry) ->
     schema_keys = [k.schema for k in result["data_schema"].schema]
     assert schema_keys == ["token"]
 
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"token": NEW_TOKEN}
-    )
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"token": NEW_TOKEN})
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "reauth_successful"
     assert token_entry.data["token"] == NEW_TOKEN
 
 
-async def test_token_flow_stores_account_id(
-    hass: HomeAssistant, aioclient_mock
-) -> None:
+async def test_token_flow_stores_account_id(hass: HomeAssistant, aioclient_mock) -> None:
     """When the server exposes an account id, it's recorded on the entry."""
-    mock_cellarion_api(
-        aioclient_mock, whoami_status=200, whoami_json={"id": "ACCOUNT-X"}
-    )
+    mock_cellarion_api(aioclient_mock, whoami_status=200, whoami_json={"id": "ACCOUNT-X"})
     result = await _menu_to(hass, "token")
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {"url": BASE_URL, "token": TEST_TOKEN}
@@ -217,15 +195,11 @@ async def test_token_flow_stores_account_id(
     }
 
 
-async def test_reauth_token_wrong_account_aborts(
-    hass: HomeAssistant, aioclient_mock
-) -> None:
+async def test_reauth_token_wrong_account_aborts(hass: HomeAssistant, aioclient_mock) -> None:
     """Reauth with a token for a different account is rejected, not accepted."""
     entry = _token_entry_with_account("ACCOUNT-A")
     entry.add_to_hass(hass)
-    mock_cellarion_api(
-        aioclient_mock, whoami_status=200, whoami_json={"id": "ACCOUNT-B"}
-    )
+    mock_cellarion_api(aioclient_mock, whoami_status=200, whoami_json={"id": "ACCOUNT-B"})
 
     result = await _menu_to(
         hass,
@@ -233,24 +207,18 @@ async def test_reauth_token_wrong_account_aborts(
         context={"source": SOURCE_REAUTH, "entry_id": entry.entry_id},
         data=entry.data,
     )
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"token": NEW_TOKEN}
-    )
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"token": NEW_TOKEN})
     assert result["type"] is FlowResultType.FORM
     assert result["errors"] == {"base": "account_mismatch"}
     # The entry is untouched — no silent account switch
     assert entry.data["token"] == TEST_TOKEN
 
 
-async def test_reauth_token_same_account_succeeds(
-    hass: HomeAssistant, aioclient_mock
-) -> None:
+async def test_reauth_token_same_account_succeeds(hass: HomeAssistant, aioclient_mock) -> None:
     """Reauth with a new token for the SAME account swaps it as normal."""
     entry = _token_entry_with_account("ACCOUNT-A")
     entry.add_to_hass(hass)
-    mock_cellarion_api(
-        aioclient_mock, whoami_status=200, whoami_json={"id": "ACCOUNT-A"}
-    )
+    mock_cellarion_api(aioclient_mock, whoami_status=200, whoami_json={"id": "ACCOUNT-A"})
 
     result = await _menu_to(
         hass,
@@ -258,9 +226,7 @@ async def test_reauth_token_same_account_succeeds(
         context={"source": SOURCE_REAUTH, "entry_id": entry.entry_id},
         data=entry.data,
     )
-    result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"token": NEW_TOKEN}
-    )
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {"token": NEW_TOKEN})
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "reauth_successful"
     assert entry.data["token"] == NEW_TOKEN
@@ -300,9 +266,7 @@ async def test_reconfigure_token_changes_url(
     "bad_url",
     ["cellarion.local", "javascript:alert(1)", "https://user:pw@cellarion.local", ""],
 )
-async def test_token_flow_rejects_invalid_url(
-    hass: HomeAssistant, aioclient_mock, bad_url
-) -> None:
+async def test_token_flow_rejects_invalid_url(hass: HomeAssistant, aioclient_mock, bad_url) -> None:
     """Bare hosts, odd schemes and URLs carrying credentials are refused."""
     result = await _menu_to(hass, "token")
     result = await hass.config_entries.flow.async_configure(
@@ -314,9 +278,7 @@ async def test_token_flow_rejects_invalid_url(
     assert not aioclient_mock.mock_calls
 
 
-async def test_token_flow_same_account_twice_aborts(
-    hass: HomeAssistant, aioclient_mock
-) -> None:
+async def test_token_flow_same_account_twice_aborts(hass: HomeAssistant, aioclient_mock) -> None:
     """Two different tokens for one account are one entry, not two."""
     entry = MockConfigEntry(
         domain=DOMAIN,
@@ -325,9 +287,7 @@ async def test_token_flow_same_account_twice_aborts(
         data={"url": BASE_URL, "token": TEST_TOKEN, "account_id": "ACCOUNT-A"},
     )
     entry.add_to_hass(hass)
-    mock_cellarion_api(
-        aioclient_mock, whoami_status=200, whoami_json={"id": "ACCOUNT-A"}
-    )
+    mock_cellarion_api(aioclient_mock, whoami_status=200, whoami_json={"id": "ACCOUNT-A"})
     result = await _menu_to(hass, "token")
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"], {"url": BASE_URL, "token": NEW_TOKEN}
@@ -336,9 +296,7 @@ async def test_token_flow_same_account_twice_aborts(
     assert result["reason"] == "already_configured"
 
 
-async def test_reauth_password(
-    hass: HomeAssistant, aioclient_mock, password_entry
-) -> None:
+async def test_reauth_password(hass: HomeAssistant, aioclient_mock, password_entry) -> None:
     """Reauth via email+password mints a fresh token and drops the password."""
     password_entry.add_to_hass(hass)
     mock_cellarion_api(aioclient_mock)
@@ -373,9 +331,7 @@ async def test_reconfigure_collision_aborts(
     )
     other.add_to_hass(hass)
     token_entry.add_to_hass(hass)
-    mock_cellarion_api(
-        aioclient_mock, whoami_status=200, whoami_json={"id": "ACCOUNT-B"}
-    )
+    mock_cellarion_api(aioclient_mock, whoami_status=200, whoami_json={"id": "ACCOUNT-B"})
 
     result = await _menu_to(
         hass,
@@ -390,9 +346,7 @@ async def test_reconfigure_collision_aborts(
     assert token_entry.data["token"] == TEST_TOKEN
 
 
-async def test_options_flow_sets_scan_interval(
-    hass: HomeAssistant, token_entry
-) -> None:
+async def test_options_flow_sets_scan_interval(hass: HomeAssistant, token_entry) -> None:
     """The options form stores the interval and refuses one below the floor."""
     token_entry.add_to_hass(hass)
     result = await hass.config_entries.options.async_init(token_entry.entry_id)
@@ -400,9 +354,7 @@ async def test_options_flow_sets_scan_interval(
     assert result["step_id"] == "init"
 
     with pytest.raises(vol.Invalid):
-        await hass.config_entries.options.async_configure(
-            result["flow_id"], {"scan_interval": 60}
-        )
+        await hass.config_entries.options.async_configure(result["flow_id"], {"scan_interval": 60})
 
     result = await hass.config_entries.options.async_configure(
         result["flow_id"], {"scan_interval": 900}

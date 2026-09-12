@@ -7,10 +7,9 @@ from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
-import pytest
-
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import issue_registry as ir
+import pytest
 
 from custom_components.cellarion import push
 from custom_components.cellarion.api import (
@@ -68,9 +67,7 @@ async def _run_listener(coordinator, runtime: float = 0.3) -> None:
 
 async def test_events_trigger_refresh_and_interval(hass: HomeAssistant) -> None:
     """Connected stream relaxes polling; events trigger refreshes."""
-    coordinator = FakeCoordinator(
-        hass, FakeClient(events=("ready", "stats_changed"))
-    )
+    coordinator = FakeCoordinator(hass, FakeClient(events=("ready", "stats_changed")))
     await _run_listener(coordinator)
 
     # ready + stats_changed + post-disconnect catch-up
@@ -82,9 +79,7 @@ async def test_events_trigger_refresh_and_interval(hass: HomeAssistant) -> None:
 
 async def test_not_supported_falls_back(hass: HomeAssistant) -> None:
     """A server without push leaves polling untouched."""
-    coordinator = FakeCoordinator(
-        hass, FakeClient(exc=CellarionPushNotSupported("nope"))
-    )
+    coordinator = FakeCoordinator(hass, FakeClient(exc=CellarionPushNotSupported("nope")))
     await _run_listener(coordinator)
 
     assert coordinator.async_request_refresh.await_count == 0
@@ -93,9 +88,7 @@ async def test_not_supported_falls_back(hass: HomeAssistant) -> None:
 
 async def test_forbidden_creates_repair_issue(hass: HomeAssistant) -> None:
     """A 403 stream creates a repair issue and stops the listener."""
-    coordinator = FakeCoordinator(
-        hass, FakeClient(exc=CellarionPushForbidden("no read scope"))
-    )
+    coordinator = FakeCoordinator(hass, FakeClient(exc=CellarionPushForbidden("no read scope")))
     task = asyncio.create_task(async_push_listener(coordinator))
     await asyncio.sleep(0.1)
     # Listener returned on its own — no cancel needed
@@ -143,9 +136,7 @@ class _FakeAsyncio:
             raise _StopLoop
 
 
-async def test_backoff_grows_when_stream_flaps(
-    hass: HomeAssistant, monkeypatch
-) -> None:
+async def test_backoff_grows_when_stream_flaps(hass: HomeAssistant, monkeypatch) -> None:
     """A stream that connects then drops instantly must back off, not busy-loop."""
     delays: list[float] = []
     monkeypatch.setattr(push, "asyncio", _FakeAsyncio(delays, stop_after=3))
@@ -163,9 +154,7 @@ async def test_backoff_grows_when_stream_flaps(
     assert delays[0] >= RECONNECT_MIN_SECONDS
 
 
-async def test_backoff_resets_after_stable_connection(
-    hass: HomeAssistant, monkeypatch
-) -> None:
+async def test_backoff_resets_after_stable_connection(hass: HomeAssistant, monkeypatch) -> None:
     """A connection that stays up long enough resets the backoff to its minimum."""
     delays: list[float] = []
     monkeypatch.setattr(push, "asyncio", _FakeAsyncio(delays, stop_after=2))
@@ -181,9 +170,7 @@ async def test_backoff_resets_after_stable_connection(
     assert all(d < RECONNECT_MIN_SECONDS * 2 for d in delays)
 
 
-async def test_unexpected_exception_keeps_listener_alive(
-    hass: HomeAssistant, monkeypatch
-) -> None:
+async def test_unexpected_exception_keeps_listener_alive(hass: HomeAssistant, monkeypatch) -> None:
     """An error the client didn't map must reconnect with backoff, not die."""
     delays: list[float] = []
     monkeypatch.setattr(push, "asyncio", _FakeAsyncio(delays, stop_after=2))

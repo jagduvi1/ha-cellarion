@@ -1,0 +1,6 @@
+# Test and lint toolchain. CI installs this plus one pinned
+# pytest-homeassistant-custom-component per matrix entry (see validate.yml).
+pytest-homeassistant-custom-component
+pytest-cov
+mypy
+ruff

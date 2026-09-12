@@ -8,7 +8,7 @@ from homeassistant.helpers import entity_registry as er
 from custom_components.cellarion.coordinator import _parse_peak_bottles
 from custom_components.cellarion.sensor import SENSOR_DESCRIPTIONS
 
-from .conftest import BASE_URL, mock_cellarion_api
+from .conftest import mock_cellarion_api
 
 
 def _desc(key: str):
@@ -50,9 +50,7 @@ async def test_peak_bottles_attribute_sorted(
     assert bottles[0]["drink_to"] == 2027
 
 
-async def test_urgent_bottles_attribute(
-    hass: HomeAssistant, aioclient_mock, token_entry
-) -> None:
+async def test_urgent_bottles_attribute(hass: HomeAssistant, aioclient_mock, token_entry) -> None:
     """Urgent bottles carry ids for the consume service."""
     await _setup(hass, aioclient_mock, token_entry)
 
@@ -97,9 +95,7 @@ def test_intake_per_year_handles_null_pace() -> None:
 
 def test_extra_attrs_tolerate_missing_keys() -> None:
     """Attribute builders don't KeyError on list elements missing keys."""
-    countries = _desc("countries").extra_attrs_fn(
-        {"by_country": [{"name": "Italy"}, {"count": 3}]}
-    )
+    countries = _desc("countries").extra_attrs_fn({"by_country": [{"name": "Italy"}, {"count": 3}]})
     assert countries["top_countries"] == [
         {"name": "Italy", "count": 0},
         {"name": None, "count": 3},

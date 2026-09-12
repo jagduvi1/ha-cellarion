@@ -163,9 +163,7 @@ SENSOR_DESCRIPTIONS: tuple[CellarionSensorDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: (
-            round(v, 1)
-            if (v := d.get("pace", {}).get("avgIntakePerYear")) is not None
-            else None
+            round(v, 1) if (v := d.get("pace", {}).get("avgIntakePerYear")) is not None else None
         ),
     ),
     CellarionSensorDescription(
@@ -275,7 +273,7 @@ class CellarionSensor(CellarionEntity, SensorEntity):
     @property
     def native_value(self) -> Any:
         """Return the sensor value."""
-        if self.coordinator.data is None:
+        if not self.coordinator.data:
             return None
         return self.entity_description.value_fn(self.coordinator.data)
 
@@ -283,23 +281,15 @@ class CellarionSensor(CellarionEntity, SensorEntity):
     def native_unit_of_measurement(self) -> str | None:
         """Return the unit — use currency from API for monetary sensors."""
         if (
-            self.entity_description.device_class
-            == SensorDeviceClass.MONETARY
+            self.entity_description.device_class == SensorDeviceClass.MONETARY
             and self.coordinator.data
         ):
-            return str(
-                self.coordinator.data.get("overview", {}).get("currency", "EUR")
-            )
+            return str(self.coordinator.data.get("overview", {}).get("currency", "EUR"))
         return self.entity_description.native_unit_of_measurement
 
     @property
     def extra_state_attributes(self) -> dict[str, Any] | None:
         """Return extra attributes."""
-        if (
-            self.entity_description.extra_attrs_fn
-            and self.coordinator.data
-        ):
-            return self.entity_description.extra_attrs_fn(
-                self.coordinator.data
-            )
+        if self.entity_description.extra_attrs_fn and self.coordinator.data:
+            return self.entity_description.extra_attrs_fn(self.coordinator.data)
         return None
