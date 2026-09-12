@@ -13,6 +13,8 @@ import pytest
 
 from custom_components.cellarion import push
 from custom_components.cellarion.api import (
+    CellarionApiError,
+    CellarionAuthError,
     CellarionPushForbidden,
     CellarionPushNotSupported,
 )
@@ -183,3 +185,50 @@ async def test_unexpected_exception_keeps_listener_alive(hass: HomeAssistant, mo
 
     assert len(delays) == 2
     assert delays[0] >= RECONNECT_MIN_SECONDS
+
+
+async def test_auth_error_stops_listener(hass: HomeAssistant) -> None:
+    """Bad credentials end the listener; the polling path owns the reauth."""
+    coordinator = FakeCoordinator(hass, FakeClient(exc=CellarionAuthError("no")))
+    task = asyncio.create_task(async_push_listener(coordinator))
+    await asyncio.sleep(0.05)
+    assert task.done() and task.exception() is None
+    assert coordinator.update_interval == timedelta(minutes=30)
+
+
+async def test_unsupported_server_is_reprobed_later(hass: HomeAssistant, monkeypatch) -> None:
+    """A server without push is re-probed after the long retry interval."""
+    delays: list[float] = []
+    monkeypatch.setattr(push, "asyncio", _FakeAsyncio(delays, stop_after=1))
+    coordinator = FakeCoordinator(hass, FakeClient(exc=CellarionPushNotSupported("nope")))
+    with pytest.raises(_StopLoop):
+        await async_push_listener(coordinator)
+    assert delays == [push.UNSUPPORTED_RETRY_SECONDS]
+
+
+async def test_cancellation_is_not_swallowed(hass: HomeAssistant) -> None:
+    """Cancelling the listener (HA unloading the entry) must not be caught."""
+
+    class HangingClient:
+        async def events_stream(self):
+            yield "_connected"
+            await asyncio.sleep(3600)
+
+    coordinator = FakeCoordinator(hass, HangingClient())
+    task = asyncio.create_task(async_push_listener(coordinator))
+    await asyncio.sleep(0.05)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert coordinator.update_interval == timedelta(minutes=30)
+
+
+async def test_api_error_reconnects_with_backoff(hass: HomeAssistant, monkeypatch) -> None:
+    """A transport error is logged and the listener tries again after backoff."""
+    delays: list[float] = []
+    monkeypatch.setattr(push, "asyncio", _FakeAsyncio(delays, stop_after=1))
+    coordinator = FakeCoordinator(hass, FakeClient(exc=CellarionApiError("down")))
+    with pytest.raises(_StopLoop):
+        await async_push_listener(coordinator)
+    assert delays and delays[0] >= RECONNECT_MIN_SECONDS
+    assert coordinator.async_request_refresh.await_count == 0

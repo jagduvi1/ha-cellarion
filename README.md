@@ -49,14 +49,15 @@ Your wine data stays in your Cellarion account. This integration reads from the 
 
 1. Go to **Settings** > **Devices & Services** > **Add Integration**
 2. Search for **Cellarion**
-3. Pick an authentication method:
+3. Enter the **URL** of your Cellarion instance — `https://cellarion.app`
+   for the hosted service, or the address of your own server — and pick
+   an authentication method:
    - **API token (recommended)** — create one in Cellarion under
      **Settings → API tokens** with the `read` and `consume` scopes and
      paste it in. Your password never touches Home Assistant.
-   - **Email & password** — on current Cellarion servers this mints a
-     scoped API token for Home Assistant automatically and does **not**
-     store your password. (Older self-hosted servers fall back to
-     password login.)
+   - **Email & password** — signs in once, creates a scoped API token for
+     Home Assistant and does **not** store your password. Needs Cellarion
+     1.75 or newer; older self-hosted servers must be updated first.
 4. Done! Sensors will appear under the **Cellarion** device
 
 ### Options
@@ -88,13 +89,13 @@ the internet.
 - Home Assistant stores a **scoped API token** (`read` + `consume`), not
   your Cellarion password — the password path only uses your credentials
   once to create the token.
-- Setups made with older versions of this integration are migrated to a
-  token automatically on their first start against Cellarion v1.75+.
 - Tokens can be reviewed and revoked anytime in Cellarion under
   **Settings → API tokens**; revoking one triggers Home Assistant's
   re-authentication prompt.
-- Only on pre-v1.75 self-hosted servers (no token support) does the
-  integration fall back to storing the password.
+- The password is never stored. Entries made with older versions of this
+  integration against a server without token support are asked to
+  re-authenticate once after updating; that mints a token and drops the
+  stored password.
 
 ## Sensors
 
@@ -293,8 +294,8 @@ automation:
 
 - Home Assistant 2025.2 or newer (the bundled brand icon shows on 2026.3+)
 - A [cellarion.app](https://cellarion.app) account (or your own self-hosted Cellarion instance)
-- Cellarion server v1.75+ unlocks instant updates, API tokens, and the
-  card's consume button; older servers work with polling and password login
+- Cellarion server v1.75 or newer (API tokens, instant updates and the
+  card's consume button all arrived there)
 
 ## Troubleshooting
 
@@ -310,6 +311,11 @@ was created without the scope the integration needs. Create a new one in
 Cellarion under **Settings → API tokens** with both the `read` and
 `consume` scopes, then use **Reconfigure** on the integration to swap it
 in. Polling keeps working in the meantime.
+
+**"Set up with a stored password, which is no longer supported."** The
+entry dates from before v1.10 and a server without API tokens. Open the
+notification and sign in with email and password once; Home Assistant
+gets a scoped token and the stored password is removed.
 
 **"Rate limited by Cellarion" during setup.** Cellarion limits logins
 per address and locks an account after repeated failures. Wait 15
@@ -335,6 +341,39 @@ works over polling while that is being sorted out.
 link defaults to the URL the integration was configured with. If that is
 an internal address (a Docker service name, for instance), set the card's
 `url` option to the address you use in the browser.
+
+## Known limitations
+
+- **One card, one account.** A card shows a single account; with several,
+  add one card per account and pick each account with `entry_id`.
+- **Lists are capped.** The card shows the five bottles closest to leaving
+  their window in each list and links into Cellarion for the rest; the
+  `peak_bottles` and `urgent_bottles` attributes carry up to ten.
+- **Instant updates need a pass-through proxy.** Self-hosted setups whose
+  reverse proxy buffers or compresses `/api/events/stream` fall back to
+  polling.
+- **Consume only.** The service marks bottles as consumed; adding, moving
+  or rating bottles stays in Cellarion.
+- **Token revocation is manual.** Deleting the integration leaves its API
+  token valid until you revoke it in Cellarion.
+- **YAML-mode dashboards** need the card resource added by hand.
+
+## Use cases
+
+- **A cellar dashboard for the kitchen tablet** — the bundled card with
+  `show_value: false` and `show_consume: false`, so guests see what is
+  ready to drink without the collection's worth or a way to alter it.
+- **"What should we open?" on the phone** — the card in the Home
+  Assistant app: the *Ready to drink* list, one tap to consume when the
+  cork is out.
+- **A nudge before a window closes** — an automation on
+  `sensor.cellarion_bottles_declining` that sends a notification listing
+  the `urgent_bottles` attribute.
+- **Logging by NFC** — a tag on each rack slot that calls
+  `cellarion.consume_bottle` with that slot's bottle id (see Services).
+- **Long-term charts** — `sensor.cellarion_total_bottles` and
+  `sensor.cellarion_collection_value` feed the statistics graph card, so
+  you can watch the cellar grow (or shrink) over years.
 
 ## Removing the integration
 

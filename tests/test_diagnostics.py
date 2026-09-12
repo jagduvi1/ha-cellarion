@@ -37,7 +37,7 @@ async def test_diagnostics_redact_secrets_and_identities(
     assert "ACCOUNT-A" not in dump
     assert "CELLAR-1" not in dump
     assert "PEAK-SOON" not in dump  # bottle ids are records too
-    assert diag["entry"]["auth_method"] == "token"
+    assert "auth_method" not in diag["entry"]
     # Harmless statistics stay readable
     assert diag["coordinator"]["data"]["overview"]["totalBottles"] == 42
     assert diag["coordinator"]["data"]["cellars"][0]["name"] == "Main"

@@ -117,19 +117,17 @@ async def test_password_flow_mints_token(hass: HomeAssistant, aioclient_mock) ->
     assert mint_call[2]["scopes"] == ["read", "consume"]
 
 
-async def test_password_flow_old_server_stores_password(
-    hass: HomeAssistant, aioclient_mock
-) -> None:
-    """Servers without /api/tokens fall back to password storage."""
+async def test_password_flow_refuses_old_server(hass: HomeAssistant, aioclient_mock) -> None:
+    """Servers without /api/tokens get an error — the password is never stored."""
     mock_cellarion_api(aioclient_mock, tokens_status=404)
     result = await _menu_to(hass, "password")
     result = await hass.config_entries.flow.async_configure(
         result["flow_id"],
         {"url": BASE_URL, "email": "user@example.com", "password": "pw"},
     )
-    assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert result["data"]["password"] == "pw"
-    assert "token" not in result["data"]
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": "server_too_old"}
+    assert not hass.config_entries.async_entries(DOMAIN)
 
 
 async def test_password_flow_invalid_auth(hass: HomeAssistant, aioclient_mock) -> None:
@@ -361,3 +359,65 @@ async def test_options_flow_sets_scan_interval(hass: HomeAssistant, token_entry)
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert token_entry.options["scan_interval"] == 900
+
+
+@pytest.mark.parametrize(
+    ("exc", "expected"),
+    [(aiohttp.ClientError("down"), "cannot_connect"), (RuntimeError("odd"), "unknown")],
+)
+async def test_password_flow_error_mapping(
+    hass: HomeAssistant, aioclient_mock, exc: Exception, expected: str
+) -> None:
+    """Connection problems and surprises during login map to their error keys."""
+    aioclient_mock.post(f"{BASE_URL}/api/auth/login", exc=exc)
+    result = await _menu_to(hass, "password")
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {"url": BASE_URL, "email": "user@example.com", "password": "pw"},
+    )
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": expected}
+
+
+async def test_password_flow_rejects_invalid_url(hass: HomeAssistant, aioclient_mock) -> None:
+    result = await _menu_to(hass, "password")
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {"url": "not a url", "email": "user@example.com", "password": "pw"},
+    )
+    assert result["errors"] == {"base": "invalid_url"}
+    assert not aioclient_mock.mock_calls
+
+
+async def test_token_flow_unexpected_error(hass: HomeAssistant, aioclient_mock) -> None:
+    """A surprise while validating the token lands on 'unknown', not a traceback."""
+    aioclient_mock.get(f"{BASE_URL}/api/stats/overview", exc=RuntimeError("odd"))
+    result = await _menu_to(hass, "token")
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"url": BASE_URL, "token": TEST_TOKEN}
+    )
+    assert result["errors"] == {"base": "unknown"}
+
+
+async def test_password_reauth_of_legacy_entry_mints_token(
+    hass: HomeAssistant, aioclient_mock, password_entry
+) -> None:
+    """The retired password entry is upgraded to a token through reauth."""
+    password_entry.add_to_hass(hass)
+    mock_cellarion_api(aioclient_mock, whoami_status=200, whoami_json={"id": "ACCOUNT-A"})
+
+    result = await _menu_to(
+        hass,
+        "password",
+        context={"source": SOURCE_REAUTH, "entry_id": password_entry.entry_id},
+        data=password_entry.data,
+    )
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"], {"email": "user@example.com", "password": "hunter2"}
+    )
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "reauth_successful"
+    assert password_entry.data["token"] == NEW_TOKEN
+    assert "password" not in password_entry.data
+    assert password_entry.data["account_id"] == "ACCOUNT-A"
+    assert password_entry.unique_id == f"{BASE_URL}_ACCOUNT-A"

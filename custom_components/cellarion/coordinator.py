@@ -24,6 +24,10 @@ from .const import DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
+# The service-status sensor is an enum; anything the health endpoint says
+# outside this set is reported as "unknown" so the entity never rejects a state.
+HEALTH_STATES = ["ok", "degraded", "unreachable", "unknown"]
+
 
 def _as_dict(value: Any) -> dict[str, Any]:
     """Return a dict for a payload section that may be missing or null."""
@@ -33,6 +37,12 @@ def _as_dict(value: Any) -> dict[str, Any]:
 def _as_list(value: Any) -> list[Any]:
     """Return a list for a payload section that may be missing or null."""
     return value if isinstance(value, list) else []
+
+
+def _health_state(value: Any) -> str:
+    """Map the server's health status onto the sensor's enum options."""
+    status = str(value).lower() if value else "unknown"
+    return status if status in HEALTH_STATES else "unknown"
 
 
 def _parse_peak_bottles(peak_data: dict[str, Any]) -> list[dict[str, Any]]:
@@ -142,7 +152,7 @@ class CellarionCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "cellar_count": cellars_data.get("count") or 0,
             "notifications": _as_list(notifications_data.get("notifications")),
             "unread_count": notifications_data.get("unreadCount") or 0,
-            "health": health_data.get("status") or "unknown",
+            "health": _health_state(health_data.get("status")),
             "instance_url": self.url,
             "peak_bottles": peak_bottles,
         }

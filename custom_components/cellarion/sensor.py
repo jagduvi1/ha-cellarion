@@ -16,7 +16,7 @@ from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .coordinator import CellarionCoordinator
+from .coordinator import HEALTH_STATES, CellarionCoordinator
 from .entity import CellarionEntity
 
 if TYPE_CHECKING:
@@ -233,6 +233,8 @@ SENSOR_DESCRIPTIONS: tuple[CellarionSensorDescription, ...] = (
         key="service_health",
         translation_key="service_health",
         entity_category=EntityCategory.DIAGNOSTIC,
+        device_class=SensorDeviceClass.ENUM,
+        options=HEALTH_STATES,
         value_fn=lambda d: d.get("health", "unknown"),
         extra_attrs_fn=lambda d: {
             "instance_url": d.get("instance_url"),

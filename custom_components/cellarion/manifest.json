@@ -10,5 +10,6 @@
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/jagduvi1/ha-cellarion/issues",
   "loggers": ["custom_components.cellarion"],
-  "version": "1.9.0"
+  "quality_scale": "platinum",
+  "version": "1.10.0"
 }
