@@ -48,10 +48,13 @@ Also, in this repository: 83 tests, 99 % coverage, mypy strict, ruff; live again
 
 ## Steps for Monday, in order
 
-1. **brands**: fork `home-assistant/brands`, add `core_integrations/cellarion/icon.png`, `icon@2x.png`, `logo.png`, `logo@2x.png` from `docs/core-submission/brands/cellarion/`, open the PR (their template asks only for the integration domain and whether it is core).
-2. **docs**: fork `home-assistant/home-assistant.io`, add `source/_integrations/cellarion.markdown` on a branch off `next`, using the draft after your review. Set `ha_release` to the release the reviewers target (they will tell you; leave the draft value otherwise).
-3. **core**: open the PR from `jagduvi1/core:cellarion` against `home-assistant/core:dev`. Use the template in full; link the docs and brands PRs in *Additional information*. Do not amend or squash the branch after opening; push new commits.
-4. After opening: reply to review comments yourself. When a change is requested, tell me the request; I make it in this repository, re-run the export, and you push the new commit.
+See `STEP-BY-STEP.md` for the walkthrough. In short, and in this order:
+
+1. **docs**: fork `home-assistant/home-assistant.io`, add `source/_integrations/cellarion.markdown` on a branch off `next`, using the draft after your review.
+2. **core**: open the PR from `jagduvi1/core:cellarion` against `home-assistant/core:dev`, linking the docs PR. Do not amend or squash the branch after opening; push new commits.
+3. **brands**: fork `home-assistant/brands`, add the four PNGs under `core_integrations/cellarion/`, tick "Add a new logo or icon for a new core integration", link the core and docs PRs.
+4. Add the brands link back into the core PR description and the core link into the docs PR description.
+5. After opening: reply to review comments yourself. When a change is requested, tell me the request; I make it in this repository, re-run the export, and you push the new commit.
 
 ## Regenerating the core branch after changes here
 
