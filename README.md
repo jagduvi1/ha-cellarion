@@ -1,6 +1,6 @@
 # Cellarion for Home Assistant
 
-[![HACS](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://hacs.xyz)
+[![HACS](https://img.shields.io/badge/HACS-Default-41BDF5.svg)](https://hacs.xyz)
 [![Release](https://img.shields.io/github/v/release/jagduvi1/ha-cellarion)](https://github.com/jagduvi1/ha-cellarion/releases)
 [![Validate](https://github.com/jagduvi1/ha-cellarion/actions/workflows/validate.yml/badge.svg)](https://github.com/jagduvi1/ha-cellarion/actions/workflows/validate.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -33,12 +33,14 @@ Your wine data stays in your Cellarion account. This integration reads from the 
 
 ### HACS (Recommended)
 
+Cellarion is in the HACS default store.
+
+[![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=jagduvi1&repository=ha-cellarion&category=integration)
+
 1. Open HACS in Home Assistant
-2. Click the three dots menu (top right) and select **Custom repositories**
-3. Add this repository URL: `https://github.com/jagduvi1/ha-cellarion`
-4. Select category: **Integration**
-5. Click **Add**, then install **Cellarion**
-6. Restart Home Assistant
+2. Search for **Cellarion** and open it
+3. Click **Download**
+4. Restart Home Assistant
 
 ### Manual
 
