@@ -78,6 +78,7 @@ def test_export_produces_a_core_layout(tmp_path: Path, stage: str) -> None:
     assert "custom_components" not in conftest
     assert "from tests.common import MockConfigEntry" in conftest
     assert "enable_custom_integrations" not in conftest
+    assert "def snapshot" not in conftest and "SnapshotAssertion" not in conftest
     for test_file in tests.glob("*.py"):
         text = test_file.read_text(encoding="utf-8")
         assert "@feature" not in text, test_file.name

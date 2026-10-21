@@ -7,6 +7,8 @@ from unittest.mock import patch
 
 import pytest
 from pytest_homeassistant_custom_component.common import MockConfigEntry
+from pytest_homeassistant_custom_component.syrupy import HomeAssistantSnapshotExtension
+from syrupy.assertion import SnapshotAssertion
 
 from custom_components.cellarion.const import DOMAIN
 
@@ -15,6 +17,18 @@ from custom_components.cellarion.const import DOMAIN
 def auto_enable_custom_integrations(enable_custom_integrations):
     """Allow loading the custom integration in every test."""
     yield
+
+
+@pytest.fixture
+def snapshot(snapshot: SnapshotAssertion) -> SnapshotAssertion:
+    """Snapshots in Home Assistant's format, stored in tests/snapshots/.
+
+    syrupy and pytest-homeassistant-custom-component both define a `snapshot`
+    fixture, and which plugin wins depends on the order pytest loads them.
+    When syrupy's plain fixture won, the test looked in __snapshots__/ and
+    failed with "does not exist". A conftest fixture always takes precedence.
+    """
+    return snapshot.use_extension(HomeAssistantSnapshotExtension)
 
 
 @pytest.fixture
