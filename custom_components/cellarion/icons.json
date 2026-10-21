@@ -25,6 +25,7 @@
     }
   },
   "services": {
-    "consume_bottle": { "service": "mdi:glass-wine" }
+    "consume_bottle": { "service": "mdi:glass-wine" },
+    "get_bottles": { "service": "mdi:bottle-wine" }
   }
 }

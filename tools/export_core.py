@@ -56,7 +56,14 @@ FEATURES: dict[str, tuple[set[str], set[str], set[str]]] = {
     "services": ({"services.py", "services.yaml"}, {"test_services.py"}, {"services"}),
     "push": ({"push.py"}, {"test_push.py"}, {"issues"}),
     "diagnostics": ({"diagnostics.py"}, {"test_diagnostics.py"}, set()),
+    # The inventory card's backend (get_bottles action, inventory cache). HACS
+    # only for now: no stage includes it.
+    "inventory": ({"inventory.py"}, {"test_inventory.py"}, set()),
 }
+
+# Actions that belong to a feature other than "services": dropped from
+# services.yaml, strings.json and icons.json when that feature is excluded.
+FEATURE_SERVICES: dict[str, set[str]] = {"inventory": {"get_bottles"}}
 
 STAGES: dict[str, set[str]] = {
     # Core's first pull request: config flow, coordinator, sensors. Nothing else.
@@ -90,6 +97,11 @@ SERVICE_EXCEPTIONS = {
     "consume_failed",
     "consume_auth_failed",
     "consume_scope_missing",
+}
+# Exception translation keys per feature, dropped when the feature is.
+FEATURE_EXCEPTIONS: dict[str, set[str]] = {
+    "services": SERVICE_EXCEPTIONS,
+    "inventory": {"inventory_not_supported", "inventory_auth_failed", "inventory_failed"},
 }
 
 FEATURE_BLOCK = re.compile(
@@ -126,31 +138,61 @@ def add_strict_typing(dest: Path) -> None:
     path.write_text("\n".join([*others, *components]) + "\n", encoding="utf-8")
 
 
-IMPORT_LINE = re.compile(r"^from (?P<module>[\w.]+) import (?P<names>[^(\n]+)$", re.M)
+IMPORT_LINE = re.compile(
+    r"^from (?P<module>[\w.]+) import (?:\((?P<group>[^)]*)\)|(?P<names>[^(\n]+))$", re.M
+)
 
 
 def prune_unused_imports(text: str) -> str:
-    """Drop names from single-line `from x import a, b as c` that nothing uses.
+    """Drop names from `from x import a, b as c` (one line or parenthesised) nothing uses.
 
-    Dropping a feature block can orphan an import that shares a line with
-    one still in use; ruff treats that fix as unsafe in __init__.py, so it is
-    done here, deterministically, for the exported copy only.
+    Dropping a feature block can orphan an import that shares a statement
+    with one still in use; ruff treats that fix as unsafe in __init__.py, so
+    it is done here, deterministically, for the exported copy only.
     """
 
     def repl(m: re.Match[str]) -> str:
         if m.group("module") == "__future__":
             return m.group(0)
         rest = text.replace(m.group(0), "")
+        grouped = m.group("group") is not None
         kept = []
-        for item in (n.strip() for n in m.group("names").split(",")):
+        for item in (n.strip() for n in (m.group("group") or m.group("names")).split(",")):
+            if not item:
+                continue
             alias = item.split(" as ")[-1].strip()
             if re.search(r"\b" + re.escape(alias) + r"\b", rest):
                 kept.append(item)
         if not kept:
             return ""
+        if grouped:
+            body = "".join(f"    {item},\n" for item in kept)
+            return f"from {m.group('module')} import (\n{body})"
         return f"from {m.group('module')} import {', '.join(kept)}"
 
     return IMPORT_LINE.sub(repl, text)
+
+
+def excluded_services(keep: set[str]) -> set[str]:
+    """Actions whose feature the stage leaves out."""
+    return set().union(*(names for f, names in FEATURE_SERVICES.items() if f not in keep))
+
+
+def drop_services(text: str, names: set[str]) -> str:
+    """Remove top-level action definitions from services.yaml text."""
+    for name in names:
+        text = re.sub(rf"^{re.escape(name)}:\n(?:[ \t]+.*\n|\n)*", "", text, flags=re.M)
+    return text.rstrip("\n") + "\n"
+
+
+def export_icons(text: str, keep: set[str]) -> str:
+    icons = json.loads(text)
+    services = icons.get("services", {})
+    for name in excluded_services(keep):
+        services.pop(name, None)
+    if "services" not in keep or not services:
+        icons.pop("services", None)
+    return json.dumps(icons, indent=2, ensure_ascii=False) + "\n"
 
 
 def export_manifest(text: str, stage: str) -> str:
@@ -193,9 +235,12 @@ def export_strings(text: str, keep: set[str]) -> str:
     dropped_keys = set().union(*(FEATURES[f][2] for f in FEATURES if f not in keep))
     for key in dropped_keys:
         strings.pop(key, None)
-    if "services" not in keep:
-        for key in SERVICE_EXCEPTIONS:
-            strings.get("exceptions", {}).pop(key, None)
+    for feature, keys in FEATURE_EXCEPTIONS.items():
+        if feature not in keep:
+            for key in keys:
+                strings.get("exceptions", {}).pop(key, None)
+    for name in excluded_services(keep):
+        strings.get("services", {}).pop(name, None)
     return json.dumps(strings, indent=2, ensure_ascii=False) + "\n"
 
 
@@ -251,6 +296,11 @@ def export(stage: str, dest: Path) -> tuple[Path, Path]:
             (comp / src.name).write_text(export_quality_scale(text or "", keep), encoding="utf-8")
         elif src.name == "strings.json":
             (comp / src.name).write_text(export_strings(text or "", keep), encoding="utf-8")
+        elif src.name == "icons.json":
+            (comp / src.name).write_text(export_icons(text or "", keep), encoding="utf-8")
+        elif src.name == "services.yaml":
+            services = drop_services(text or "", excluded_services(keep))
+            (comp / src.name).write_text(services, encoding="utf-8")
         elif src.suffix == ".py":
             stripped = prune_unused_imports(strip_features(text or "", keep))
             (comp / src.name).write_text(drop_future_annotations(stripped), encoding="utf-8")

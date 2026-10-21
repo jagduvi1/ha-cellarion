@@ -183,13 +183,14 @@ async def test_card_resource_is_created_once(
     await hass.async_block_till_done()
 
     assert resources.loaded
-    assert len(resources.created) == 1
-    assert resources.created[0]["res_type"] == "module"
-    assert resources.created[0]["url"].startswith("/cellarion-files/cellarion-card.js?v=")
+    assert [item["res_type"] for item in resources.created] == ["module", "module"]
+    urls = [item["url"] for item in resources.created]
+    assert urls[0].startswith("/cellarion-files/cellarion-card.js?v=")
+    assert urls[1].startswith("/cellarion-files/cellarion-inventory-card.js?v=")
 
     await hass.config_entries.async_reload(token_entry.entry_id)
     await hass.async_block_till_done()
-    assert len(resources.created) == 1
+    assert len(resources.created) == 2
 
 
 async def test_card_resource_is_reversioned_after_upgrade(
@@ -206,10 +207,13 @@ async def test_card_resource_is_reversioned_after_upgrade(
     assert await hass.config_entries.async_setup(token_entry.entry_id)
     await hass.async_block_till_done()
 
-    assert resources.created == []
+    # The summary card is re-versioned in place; the inventory card is new
     assert len(resources.updated) == 1
     assert resources.updated[0][0] == "r1"
     assert "?v=0.0.1" not in resources.updated[0][1]["url"]
+    assert [item["url"].split("?")[0] for item in resources.created] == [
+        "/cellarion-files/cellarion-inventory-card.js"
+    ]
 
 
 async def test_card_registration_never_blocks_setup(

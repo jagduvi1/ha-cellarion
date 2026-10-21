@@ -16,11 +16,13 @@ Your wine data stays in your Cellarion account. This integration reads from the 
 ## Features
 
 - **Dashboard card included** — a ready-made card with collection stats, a drink-window bar, and the bottles that need attention; no extra install
-- **Hide what you like** — switch off any part of the card (collection value, lists, consume buttons); handy for a dashboard guests can see
+- **Find a bottle, take it out** — a second bundled card searches your whole cellar, shows where each bottle is (rack, shelf, slot) and takes it out with one tap (Cellarion 1.275+)
+- **Hide what you like** — switch off any part of the cards (collection value, prices, notes, consume buttons); handy for a dashboard guests can see
 - **Collection overview** — total bottles, value, unique wines, average rating
 - **Drink window tracking** — bottles at peak, declining, not ready, early/late window
 - **Maturity alerts** — urgent bottles listed as sensor attributes
 - **Consume from Home Assistant** — mark bottles drank/gifted/sold via the `cellarion.consume_bottle` service, from the card, automations, or NFC tags
+- **Your bottles in scripts** — the `cellarion.get_bottles` action returns the inventory (optionally filtered) for scripts, automations and voice assistants
 - **Instant updates** — on Cellarion v1.75+, sensors update within seconds of a change (automatic, no ports to open)
 - **Secure by default** — authenticates with a scoped API token; your Cellarion password is never stored in Home Assistant
 - **Pace & runway** — intake per year, years until your cellar is empty
@@ -170,6 +172,57 @@ automation:
           reason: drank
 ```
 
+### `cellarion.get_bottles`
+
+Return the bottles in your cellars — the ones you own and the ones shared
+with you — with where each is stored, its drink window and your personal
+fields. Needs Cellarion 1.275 or newer. The inventory card uses it; so can
+your scripts.
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `search` | no | Words that must all appear in the wine, producer, region, grape, vintage, storage place or a personal field (accents don't matter) |
+| `maturity` | no | Only these states: `not-ready`, `early`, `peak`, `late`, `declining` |
+| `type` | no | Only these wine types, e.g. `red`, `white` |
+| `cellar` | no | Only this cellar, by name or id |
+| `entry_id` | no | Only when multiple Cellarion accounts are configured |
+
+The response holds `cellars`, `racks`, `wines` (each wine once, keyed by
+id) and `bottles` (each referring to its wine by id), plus `instance_url`.
+A bottle carries its `vintage`, `maturity`, `window` (drink-from, peak
+and drink-to years), `location` (rack name with shelf, row and column
+where the rack type has them), `place` (Cellarion's free-text location),
+`price`, `notes` and `personal` fields.
+
+Example — say how many bottles of a wine are left:
+
+```yaml
+script:
+  bottles_left:
+    fields:
+      wine:
+        example: barolo
+    sequence:
+      - action: cellarion.get_bottles
+        data:
+          search: "{{ wine }}"
+        response_variable: inventory
+      - action: notify.mobile_app
+        data:
+          message: >
+            {{ inventory.bottles | count }} bottle(s) matching {{ wine }}
+            in the cellar.
+```
+
+Any signed-in Home Assistant user can call the action, so the inventory
+card's toggles (prices, notes, personal fields) hide those from the screen,
+not from someone with access to the developer tools.
+
+Nothing is fetched until the action is called. Cellarion builds the
+inventory in one request and answers a repeat with "not modified" when
+nothing changed, and calls within 30 seconds of each other are answered
+from memory.
+
 ## Dashboard Examples
 
 > **Home Assistant 2026+:** the default **Overview** dashboard is
@@ -206,11 +259,11 @@ It shows your collection stats, a drink-window distribution bar, a
 first), and a **Drink soon** list (declining/late bottles). Clicking any
 number opens the sensor's more-info dialog, the card title opens your
 Cellarion instance, and — on Cellarion v1.75+ — every listed bottle gets
-a one-tap consume button (with confirmation). For browsing your full
-inventory, follow the card link into Cellarion itself. Anything you'd
-rather not have on display can be switched off — see below. If your
-dashboards run in YAML mode, add `/cellarion-files/cellarion-card.js`
-as a module resource manually.
+a one-tap consume button (with confirmation). To find a particular
+bottle, use the inventory card below. Anything you'd rather not have on
+display can be switched off — see below. If your dashboards run in YAML
+mode, add `/cellarion-files/cellarion-card.js` as a module resource
+manually.
 
 #### Hiding parts of the card
 
@@ -266,6 +319,47 @@ my_theme:
 Text in those colours is blended towards the theme's text colour, so it
 stays readable on light and dark themes alike.
 
+### Cellarion Inventory card (bundled)
+
+A second card for finding a bottle and taking it out — made for a tablet
+by the racks or the phone in your hand. Needs Cellarion 1.275 or newer.
+Add it from the card picker (**Custom: Cellarion Inventory**) or in YAML:
+
+```yaml
+type: custom:cellarion-inventory-card
+title: Cellar inventory     # optional
+entry_id: <config entry>    # optional — only with more than one account
+max_results: 30             # optional — wines shown before "Show more"
+```
+
+- **Search** across wine, producer, region, grape, vintage, rack and
+  storage place (and your personal fields); every word must match and
+  accents don't matter.
+- **Filter** by wine type, drink-window state and — with several — cellar;
+  sort by name or by when the window closes.
+- **Where it is**: each wine and vintage shows its place, e.g.
+  *Left cabinet · shelf 2 · row 1 · slot 3*, or Cellarion's free-text
+  location, and how many bottles.
+- **Detail**: the drink window, price, rating, notes, your personal
+  fields and the label photo, every bottle with its place and a
+  **Take out** button (with confirmation), and a link to the bottle in
+  Cellarion for anything else.
+
+| Option | Hides when `false` |
+|--------|--------------------|
+| `show_value` | Prices |
+| `show_notes` | Your bottle notes |
+| `show_personal` | Personal fields (and searching in them) |
+| `show_images` | Label photos |
+| `show_consume` | The **Take out** buttons |
+
+Take out never shows for a cellar shared with you as a viewer. The card
+loads the inventory when it is shown and again after Cellarion reports a
+change; label photos load only for rows on screen, through Home
+Assistant (Cellarion's photos can't be embedded on another site
+directly). With YAML-mode dashboards, add
+`/cellarion-files/cellarion-inventory-card.js` as a module resource.
+
 ### Simple Entities Card
 
 ```yaml
@@ -310,7 +404,8 @@ and the latest Home Assistant release on every change.
 - Home Assistant 2025.2 or newer (the bundled brand icon shows on 2026.3+)
 - A [cellarion.app](https://cellarion.app) account (or your own self-hosted Cellarion instance)
 - Cellarion server v1.75 or newer (API tokens, instant updates and the
-  card's consume button all arrived there)
+  card's consume button all arrived there); the inventory card and the
+  `cellarion.get_bottles` action need v1.275 or newer
 
 ## Troubleshooting
 
@@ -346,6 +441,10 @@ the editor's **Advanced** section.
 a reload of the browser page picks up the new one. If a dashboard still
 shows the old card, clear the browser cache for your Home Assistant URL.
 
+**The inventory card says the server "cannot list the inventory yet".**
+The Cellarion server predates the inventory endpoint. Update it to 1.275
+or newer; the sensors and the summary card keep working meanwhile.
+
 **Self-hosted: instant updates never connect.** The push stream needs
 the reverse proxy to pass `/api/events/stream` through without buffering
 or compression (see the Cellarion docs on push events). Everything else
@@ -366,8 +465,12 @@ an internal address (a Docker service name, for instance), set the card's
 - **Instant updates need a pass-through proxy.** Self-hosted setups whose
   reverse proxy buffers or compresses `/api/events/stream` fall back to
   polling.
-- **Consume only.** The service marks bottles as consumed; adding, moving
-  or rating bottles stays in Cellarion.
+- **Read and consume only.** Home Assistant can list bottles and mark them
+  as consumed; adding, moving, rating or editing bottles stays in Cellarion
+  (the inventory card links each bottle there).
+- **The inventory card is in English** and shows no tasting profiles; the
+  `cellarion.get_bottles` response carries the profile descriptors for
+  anyone who wants them.
 - **YAML-mode dashboards** need the card resource added by hand.
 
 ## Use cases
@@ -375,6 +478,9 @@ an internal address (a Docker service name, for instance), set the card's
 - **A cellar dashboard for the kitchen tablet** — the bundled card with
   `show_value: false` and `show_consume: false`, so guests see what is
   ready to drink without the collection's worth or a way to alter it.
+- **"Where is that bottle?" at the cellar** — the inventory card on a
+  tablet by the racks: type a few letters, see the shelf and slot, take
+  it out.
 - **"What should we open?" on the phone** — the card in the Home
   Assistant app: the *Ready to drink* list, one tap to consume when the
   cork is out.

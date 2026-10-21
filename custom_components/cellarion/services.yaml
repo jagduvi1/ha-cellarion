@@ -31,3 +31,32 @@ consume_bottle:
       selector:
         config_entry:
           integration: cellarion
+
+get_bottles:
+  fields:
+    search:
+      example: "barolo 2016"
+      selector:
+        text:
+    maturity:
+      selector:
+        select:
+          multiple: true
+          options:
+            - not-ready
+            - early
+            - peak
+            - late
+            - declining
+    type:
+      example: "red"
+      selector:
+        text:
+          multiple: true
+    cellar:
+      selector:
+        text:
+    entry_id:
+      selector:
+        config_entry:
+          integration: cellarion

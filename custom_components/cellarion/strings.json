@@ -98,6 +98,15 @@
     },
     "password_entry_retired": {
       "message": "This Cellarion entry was set up with a stored password, which is no longer supported. Re-authenticate to switch it to an API token."
+    },
+    "inventory_not_supported": {
+      "message": "This Cellarion server cannot list the inventory yet. Update it to {version} or newer."
+    },
+    "inventory_auth_failed": {
+      "message": "Cellarion rejected the stored credentials while loading the inventory; re-authentication has been requested: {error}"
+    },
+    "inventory_failed": {
+      "message": "Could not load the inventory from Cellarion: {error}"
     }
   },
   "services": {
@@ -120,6 +129,32 @@
         "note": {
           "name": "Note",
           "description": "Optional tasting note or comment (max 1000 characters)."
+        },
+        "entry_id": {
+          "name": "Config entry",
+          "description": "Only needed when multiple Cellarion accounts are configured."
+        }
+      }
+    },
+    "get_bottles": {
+      "name": "Get bottles",
+      "description": "Return the bottles in your Cellarion cellars, with where each one is stored, its drink window and your personal fields. Optional filters narrow the list.",
+      "fields": {
+        "search": {
+          "name": "Search",
+          "description": "Words that must all appear in the wine, producer, region, grape, vintage, storage place or a personal field."
+        },
+        "maturity": {
+          "name": "Maturity",
+          "description": "Only bottles in these drink-window states."
+        },
+        "type": {
+          "name": "Wine type",
+          "description": "Only these wine types, for example red or white."
+        },
+        "cellar": {
+          "name": "Cellar",
+          "description": "Only bottles in this cellar (its name or id)."
         },
         "entry_id": {
           "name": "Config entry",

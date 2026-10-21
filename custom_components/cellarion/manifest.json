@@ -11,6 +11,6 @@
   "issue_tracker": "https://github.com/jagduvi1/ha-cellarion/issues",
   "loggers": ["custom_components.cellarion"],
   "quality_scale": "platinum",
-  "requirements": ["pycellarion==0.1.0"],
-  "version": "1.13.1"
+  "requirements": ["pycellarion==0.2.0"],
+  "version": "1.14.0"
 }
