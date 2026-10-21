@@ -207,13 +207,19 @@ def export_test(text: str, keep: set[str]) -> str:
         "pytest_homeassistant_custom_component.test_util.aiohttp", "tests.test_util.aiohttp"
     )
     # Core's aioclient_mock fixture lives in tests.conftest; the custom-component
-    # shim's autouse fixture is not needed there.
+    # shim's autouse fixture is not needed there, and neither is the snapshot
+    # override (core's own tests/conftest.py applies its extension).
     text = re.sub(
         r"@pytest\.fixture\(autouse=True\)\ndef auto_enable_custom_integrations\(enable_custom_integrations\):\n(?:    .*\n)+?\n",
         "",
         text,
     )
-    return text
+    text = re.sub(
+        r"\n@pytest\.fixture\ndef snapshot\(snapshot: SnapshotAssertion\) -> SnapshotAssertion:\n(?:    .*\n|\n)+?    return .*\n\n",
+        "",
+        text,
+    )
+    return prune_unused_imports(text)
 
 
 def export(stage: str, dest: Path) -> tuple[Path, Path]:

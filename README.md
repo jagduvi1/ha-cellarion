@@ -49,6 +49,10 @@ Cellarion is in the HACS default store.
 
 ## Configuration
 
+[![Open your Home Assistant instance and start setting up Cellarion.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=cellarion)
+
+Or set it up by hand:
+
 1. Go to **Settings** > **Devices & Services** > **Add Integration**
 2. Search for **Cellarion**
 3. Enter the **URL** of your Cellarion instance — `https://cellarion.app`
