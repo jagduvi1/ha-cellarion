@@ -72,6 +72,22 @@ async def test_consume_without_entries(hass: HomeAssistant) -> None:
         )
 
 
+async def test_consume_on_an_account_that_is_not_ready(
+    hass: HomeAssistant, aioclient_mock, token_entry
+) -> None:
+    """An account still retrying setup says so, not "no accounts are configured"."""
+    token_entry.add_to_hass(hass)
+    mock_cellarion_api(aioclient_mock, stats_status=503)
+    assert not await hass.config_entries.async_setup(token_entry.entry_id)
+    await hass.async_block_till_done()
+
+    for data in ({"bottle_id": BOTTLE1}, {"bottle_id": BOTTLE1, "entry_id": token_entry.entry_id}):
+        with pytest.raises(ServiceValidationError) as excinfo:
+            await hass.services.async_call(DOMAIN, "consume_bottle", data, blocking=True)
+        assert excinfo.value.translation_key == "entry_not_loaded"
+        assert excinfo.value.translation_placeholders == {"title": token_entry.title}
+
+
 async def test_consume_unknown_entry_id(hass: HomeAssistant, aioclient_mock, token_entry) -> None:
     """An unknown entry_id raises a validation error."""
     token_entry.add_to_hass(hass)

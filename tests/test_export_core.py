@@ -65,7 +65,7 @@ def test_export_produces_a_core_layout(tmp_path: Path, stage: str) -> None:
     assert "get_bottles" not in icons.get("services", {})
     if stage == "minimal":
         assert "services" not in strings and "issues" not in strings
-        assert "consume_failed" not in strings["exceptions"]
+        assert not {"consume_failed", "entry_not_loaded"} & set(strings["exceptions"])
         assert not ({"services.py", "push.py", "diagnostics.py", "services.yaml"} & names)
         assert "async_setup_services" not in init and "async_push_listener" not in init
         assert "services" not in icons

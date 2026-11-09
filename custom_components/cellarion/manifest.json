@@ -9,7 +9,7 @@
   "integration_type": "service",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/jagduvi1/ha-cellarion/issues",
-  "loggers": ["custom_components.cellarion"],
+  "loggers": ["custom_components.cellarion", "pycellarion"],
   "quality_scale": "platinum",
   "requirements": ["pycellarion==0.2.0"],
   "version": "1.14.1"
