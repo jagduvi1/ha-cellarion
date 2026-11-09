@@ -329,6 +329,8 @@ Add it from the card picker (**Custom: Cellarion Inventory**) or in YAML:
 type: custom:cellarion-inventory-card
 title: Cellar inventory     # optional
 entry_id: <config entry>    # optional — only with more than one account
+url: https://cellarion.app  # optional — overrides the title and "Open in
+                            #   Cellarion" link target
 max_results: 30             # optional — wines shown before "Show more"
 ```
 

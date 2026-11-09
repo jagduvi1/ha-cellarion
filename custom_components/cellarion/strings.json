@@ -87,6 +87,9 @@
     "multiple_accounts": {
       "message": "Multiple Cellarion accounts are configured; pass entry_id to choose one."
     },
+    "entry_not_loaded": {
+      "message": "The Cellarion account {title} isn't ready yet: it is still connecting, or it needs you to sign in again."
+    },
     "consume_failed": {
       "message": "Could not consume the bottle: {error}"
     },

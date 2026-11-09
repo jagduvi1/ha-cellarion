@@ -94,6 +94,7 @@ SERVICE_EXCEPTIONS = {
     "no_accounts",
     "unknown_entry",
     "multiple_accounts",
+    "entry_not_loaded",
     "consume_failed",
     "consume_auth_failed",
     "consume_scope_missing",

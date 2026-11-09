@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 from unittest.mock import AsyncMock, patch
 
@@ -14,6 +15,7 @@ import voluptuous as vol
 
 from custom_components.cellarion import inventory as inventory_module
 from custom_components.cellarion.const import DOMAIN
+from custom_components.cellarion.frontend import CellarionImageView
 from custom_components.cellarion.inventory import (
     INVENTORY_MIN_VERSION,
     CellarionInventory,
@@ -181,6 +183,7 @@ async def test_get_bottles_returns_the_inventory(
         ({"maturity": ["peak", "early"]}, [B_RED, B_WHITE]),
         ({"maturity": "early"}, [B_WHITE]),
         ({"type": ["white"]}, [B_WHITE]),
+        ({"type": "WHITE"}, [B_WHITE]),  # case and accents folded, like search
         ({"cellar": "cabin"}, [B_WHITE]),
         ({"cellar": CELLAR_HOME}, [B_RED, B_PENDING]),
         ({"cellar": "nowhere"}, []),
@@ -207,6 +210,16 @@ async def test_get_bottles_rejects_unknown_maturity(
 
     with pytest.raises(vol.Invalid):
         await _get_bottles(hass, maturity=["ancient"])
+
+
+async def test_get_bottles_caps_the_filter_lists(
+    hass: HomeAssistant, aioclient_mock, token_entry
+) -> None:
+    """The lists are scanned once per bottle, so they are kept short."""
+    await _setup(hass, aioclient_mock, token_entry)
+
+    with pytest.raises(vol.Invalid):
+        await _get_bottles(hass, type=["red"] * 11)
 
 
 async def test_repeat_calls_are_answered_from_memory(
@@ -236,6 +249,24 @@ async def test_coordinator_update_marks_the_inventory_stale(
     await _get_bottles(hass)
 
     await token_entry.runtime_data.async_refresh()
+    await _get_bottles(hass)
+
+    assert len(_inventory_calls(aioclient_mock)) == 2
+
+
+async def test_consume_marks_the_inventory_stale(
+    hass: HomeAssistant, aioclient_mock, token_entry
+) -> None:
+    """A take-out asks again at once, even when the coordinator refresh is held back."""
+    await _setup(hass, aioclient_mock, token_entry)
+    aioclient_mock.post(f"{BASE_URL}/api/bottles/{B_RED}/consume", json={"bottle": {}})
+    await _get_bottles(hass)
+
+    # A refresh already running (or the debounce) turns this call into a no-op.
+    with patch.object(token_entry.runtime_data, "async_request_refresh", AsyncMock()):
+        await hass.services.async_call(
+            DOMAIN, "consume_bottle", {"bottle_id": B_RED}, blocking=True
+        )
     await _get_bottles(hass)
 
     assert len(_inventory_calls(aioclient_mock)) == 2
@@ -340,6 +371,41 @@ async def test_cache_keeps_its_copy_on_304() -> None:
     assert await cache.async_get() is INVENTORY
 
     assert [c.args for c in client.get_inventory.call_args_list] == [(None,), ("t1",)]
+
+
+async def test_a_change_during_a_fetch_is_not_lost() -> None:
+    """An invalidate that lands while a fetch is on its way keeps the next read asking."""
+    client = AsyncMock()
+    started = asyncio.Event()
+    release = asyncio.Event()
+
+    async def slow(_etag: str | None) -> InventoryResult:
+        started.set()
+        await release.wait()
+        return InventoryResult(data=INVENTORY, etag="t1", not_modified=False)
+
+    client.get_inventory.side_effect = slow
+    cache = CellarionInventory(client)
+    task = asyncio.create_task(cache.async_get())
+    await started.wait()
+    cache.invalidate()  # e.g. a push event while the answer is in flight
+    release.set()
+    assert await task is INVENTORY
+
+    client.get_inventory.side_effect = None
+    client.get_inventory.return_value = InventoryResult(data=None, etag="t1", not_modified=True)
+    assert await cache.async_get() is INVENTORY
+    assert client.get_inventory.await_count == 2
+
+
+async def test_image_cache_counts_a_replaced_copy_once(hass: HomeAssistant) -> None:
+    """Two misses on one image store it once; the byte total stays honest."""
+    view = CellarionImageView(hass)
+    view._remember(("entry", "/thumb"), b"x" * 10, "image/webp")
+    view._remember(("entry", "/thumb"), b"x" * 10, "image/webp")
+
+    assert len(view._cache) == 1
+    assert view._cache_bytes == 10
 
 
 async def test_cache_refuses_an_empty_answer() -> None:

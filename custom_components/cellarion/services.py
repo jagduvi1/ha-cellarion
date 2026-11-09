@@ -25,6 +25,7 @@ from .coordinator import CellarionConfigEntry
 
 # @feature inventory
 from .inventory import (
+    INVENTORIES,
     INVENTORY_MIN_VERSION,
     MATURITY_STATES,
     async_get_inventory,
@@ -54,8 +55,13 @@ SERVICE_GET_BOTTLES = "get_bottles"
 SERVICE_GET_BOTTLES_SCHEMA = vol.Schema(
     {
         vol.Optional("search"): vol.All(cv.string, vol.Length(max=200)),
-        vol.Optional("maturity"): vol.All(cv.ensure_list, [vol.In(MATURITY_STATES)]),
-        vol.Optional("type"): vol.All(cv.ensure_list, [vol.All(cv.string, vol.Length(max=40))]),
+        # The lists are scanned once per bottle: keep them short.
+        vol.Optional("maturity"): vol.All(
+            cv.ensure_list, vol.Length(max=len(MATURITY_STATES)), [vol.In(MATURITY_STATES)]
+        ),
+        vol.Optional("type"): vol.All(
+            cv.ensure_list, vol.Length(max=10), [vol.All(cv.string, vol.Length(max=40))]
+        ),
         vol.Optional("cellar"): vol.All(cv.string, vol.Length(max=100)),
         vol.Optional("entry_id"): cv.string,
     }
@@ -63,27 +69,37 @@ SERVICE_GET_BOTTLES_SCHEMA = vol.Schema(
 # @endfeature
 
 
+def _not_loaded(entries: list[CellarionConfigEntry]) -> ServiceValidationError:
+    """An account that is set up but not running (connecting, or awaiting sign-in)."""
+    return ServiceValidationError(
+        translation_domain=DOMAIN,
+        translation_key="entry_not_loaded",
+        translation_placeholders={"title": ", ".join(entry.title for entry in entries)},
+    )
+
+
 def _resolve_entry(call: ServiceCall) -> CellarionConfigEntry:
     """The loaded entry a service call is for: entry_id, or the only one."""
-    entries: list[CellarionConfigEntry] = [
-        entry
-        for entry in call.hass.config_entries.async_entries(DOMAIN)
-        if entry.state is ConfigEntryState.LOADED
-    ]
-    if not entries:
+    configured: list[CellarionConfigEntry] = call.hass.config_entries.async_entries(DOMAIN)
+    if not configured:
         raise ServiceValidationError(translation_domain=DOMAIN, translation_key="no_accounts")
 
     if entry_id := call.data.get("entry_id"):
-        matches = [entry for entry in entries if entry.entry_id == entry_id]
+        matches = [entry for entry in configured if entry.entry_id == entry_id]
         if not matches:
             raise ServiceValidationError(
                 translation_domain=DOMAIN,
                 translation_key="unknown_entry",
                 translation_placeholders={"entry_id": entry_id},
             )
+        if matches[0].state is not ConfigEntryState.LOADED:
+            raise _not_loaded(matches)
         return matches[0]
-    if len(entries) == 1:
-        return entries[0]
+    loaded = [entry for entry in configured if entry.state is ConfigEntryState.LOADED]
+    if len(loaded) == 1:
+        return loaded[0]
+    if not loaded:
+        raise _not_loaded(configured)
     raise ServiceValidationError(translation_domain=DOMAIN, translation_key="multiple_accounts")
 
 
@@ -122,6 +138,14 @@ async def _async_consume_bottle(call: ServiceCall) -> None:
             translation_placeholders={"error": str(err)},
         ) from err
 
+    # @feature inventory
+    # The bottle is gone now. The refresh below would mark the inventory
+    # stale through the coordinator, but it is skipped while another refresh
+    # runs or the debounce holds it back; a get_bottles right after this
+    # call must not list the bottle again.
+    if inventory := call.hass.data.get(INVENTORIES, {}).get(entry.entry_id):
+        inventory.invalidate()
+    # @endfeature
     await coordinator.async_request_refresh()
 
 
@@ -129,6 +153,8 @@ async def _async_consume_bottle(call: ServiceCall) -> None:
 async def _async_get_bottles(call: ServiceCall) -> ServiceResponse:
     """Handle the cellarion.get_bottles service: the (filtered) inventory."""
     entry = _resolve_entry(call)
+    # Read before the await: the entry may unload while the fetch runs.
+    instance_url = entry.runtime_data.url
     inventory = async_get_inventory(call.hass, entry)
     try:
         data = await inventory.async_get()
@@ -161,7 +187,7 @@ async def _async_get_bottles(call: ServiceCall) -> ServiceResponse:
     )
     return {
         "entry_id": entry.entry_id,
-        "instance_url": entry.runtime_data.url,
+        "instance_url": instance_url,
         **result,
     }
 

@@ -45,12 +45,16 @@ class CellarionInventory:
         self._etag: str | None = None
         self._fetched_at = 0.0
         self._stale = False
+        # Bumped by every invalidate, so a change that arrives while a fetch
+        # is on its way is not wiped out when that (older) answer lands.
+        self._generation = 0
         self._lock = asyncio.Lock()
 
     @callback
     def invalidate(self) -> None:
         """Ask the server again on the next read (something changed)."""
         self._stale = True
+        self._generation += 1
 
     async def async_get(self) -> dict[str, Any]:
         """Return the inventory, asking the server only when it may have changed."""
@@ -62,6 +66,7 @@ class CellarionInventory:
                 and now - self._fetched_at < MIN_REFETCH_SECONDS
             ):
                 return self._data
+            generation = self._generation
             result = await self.client.get_inventory(self._etag if self._data else None)
             if not result.not_modified:
                 if result.data is None:
@@ -71,7 +76,7 @@ class CellarionInventory:
             elif self._data is None:  # pragma: no cover - a 304 needs a tag we sent
                 raise CellarionApiError("Cellarion answered 304 to a first request")
             self._fetched_at = now
-            self._stale = False
+            self._stale = self._generation != generation
             return self._data
 
 
@@ -151,6 +156,9 @@ def filter_inventory(
     wines: dict[str, Any] = _as_dict(data.get("wines"))
     cellars = [c for c in data.get("cellars") or [] if isinstance(c, dict)]
     terms = _fold(search).split() if search else []
+    maturities = set(maturity or ())
+    # Like search: "Rose", "rosé" and "Rosé" all mean the rosé type.
+    wanted_types = {_fold(t) for t in types or ()}
     cellar_ids: set[str] | None = None
     if cellar:
         wanted = _fold(cellar)
@@ -167,9 +175,9 @@ def filter_inventory(
         wine = _as_dict(wines.get(str(bottle.get("wine"))))
         if cellar_ids is not None and str(bottle.get("cellar")) not in cellar_ids:
             continue
-        if maturity and bottle.get("maturity") not in maturity:
+        if maturities and bottle.get("maturity") not in maturities:
             continue
-        if types and wine.get("type") not in types:
+        if wanted_types and _fold(str(wine.get("type") or "")) not in wanted_types:
             continue
         if terms:
             text = _searchable(bottle, wine)

@@ -11,6 +11,10 @@
  *   title: Cellar inventory      (optional)
  *   entry_id: <config entry>     (optional — only needed when more than one
  *                                 Cellarion account is configured)
+ *   url: https://cellarion.app   (optional — the address the title and the
+ *                                 "Open in Cellarion" links use, when your
+ *                                 browser reaches Cellarion at another address
+ *                                 than Home Assistant does)
  *   max_results: 30              (optional — wines listed before "Show more")
  *   show_value: false            (optional — each show_* flag in TOGGLES
  *                                 below defaults to true; false hides prices,
@@ -38,6 +42,7 @@ const MAX_DEFER_MS = 10000;     // a chatty sensor cannot postpone it longer
 const MIN_INTERVAL_MS = 30000;  // never refetch more often than this
 const STALE_MS = 60000;         // refetch on return after this long away
 const TAKEN_TTL_MS = 300000;    // hide a taken-out bottle until data catches up
+const ASK_GUARD_MS = 500;       // a confirm this soon after Take out is a double-click
 const IMAGE_CONCURRENCY = 4;
 const IMAGE_CACHE_MAX = 200;
 
@@ -339,6 +344,7 @@ class CellarionInventoryCard extends HTMLElement {
     this._askId = null;        // bottle whose inline take-out prompt is open
     this._busy = new Set();    // bottle ids whose consume call is in flight
     this._takeError = null;
+    this._listError = null;    // a failed take-out whose row is no longer on screen
     // Label images: url → { src } | { pending } | { failed }.
     this._images = new Map();
     this._imgQueue = [];
@@ -369,6 +375,7 @@ class CellarionInventoryCard extends HTMLElement {
       this._loading = false;
       this._index = null;
       this._error = null;
+      this._listError = null;
       this._lastFetch = null;
       this._watch = null;
       this._openKey = null;
@@ -538,9 +545,14 @@ class CellarionInventoryCard extends HTMLElement {
   _pruneState() {
     const idx = this._index;
     if (!idx) return;
+    // A filter whose chips are no longer shown (one value or none left) is
+    // dropped too: nothing on screen could turn it off again, and it would
+    // hide the bottles that carry no value at all (a wine with no type yet).
+    if (idx.types.length <= 1) this._types.clear();
+    if (idx.maturities.length <= 1) this._maturities.clear();
     for (const t of this._types) if (!idx.types.includes(t)) this._types.delete(t);
     for (const m of this._maturities) if (!idx.maturities.includes(m)) this._maturities.delete(m);
-    if (this._cellar && !idx.cellarName.has(this._cellar)) this._cellar = "";
+    if (this._cellar && (idx.cellars.length <= 1 || !idx.cellarName.has(this._cellar))) this._cellar = "";
     if (this._askId && !idx.byId.has(this._askId)) this._askId = null;
     const now = Date.now();
     for (const [id, at] of this._taken) {
@@ -599,7 +611,10 @@ class CellarionInventoryCard extends HTMLElement {
   }
 
   _instanceUrl() {
-    const raw = this._index?.data?.instance_url;
+    // A pasted value often carries a stray space; the check below would
+    // otherwise drop every link for it.
+    const own = typeof this._config?.url === "string" ? this._config.url.trim() : "";
+    const raw = own || this._index?.data?.instance_url;
     // Only ever link to an http(s) target, never javascript:/data:.
     return typeof raw === "string" && /^https?:\/\/[^\s"'<>]+$/i.test(raw) ? raw.replace(/\/+$/, "") : null;
   }
@@ -736,11 +751,14 @@ class CellarionInventoryCard extends HTMLElement {
     const el = this._el;
     if (!el) return;
     const idx = this._index;
-    const errorHtml = this._error ? `
+    const errorHtml = (this._error ? `
       <div class="error" role="alert">
         <div class="etxt"><div class="etitle">Could not load the inventory</div>${esc(this._error)}</div>
         <button type="button" class="btn" data-action="retry" data-key="retry">Try again</button>
-      </div>` : "";
+      </div>` : "") + (this._listError ? `
+      <div class="error" role="alert">
+        <div class="etxt"><div class="etitle">Could not take it out</div>${esc(this._listError)}</div>
+      </div>` : "");
     if (!idx) {
       el.summary.textContent = "";
       this._swap(el.notice, errorHtml || `<div class="msg">Loading your cellar…</div>`);
@@ -1009,10 +1027,13 @@ class CellarionInventoryCard extends HTMLElement {
     } else if (action === "retry") {
       this._fetch();
     } else if (action === "take") {
-      this._ask(el.dataset.bottle);
+      this._ask(el.dataset.bottle, ev.timeStamp);
     } else if (action === "cancel-take") {
       this._cancelAsk();
     } else if (action === "confirm-take") {
+      // The confirm button opens where Take out was: the second click of
+      // a double-click (or a quick second tap) must not answer the prompt.
+      if (ev.detail > 1 || ev.timeStamp - this._askAt < ASK_GUARD_MS) return;
       this._take(el.dataset.bottle);
     }
   }
@@ -1055,6 +1076,7 @@ class CellarionInventoryCard extends HTMLElement {
     this._returnKey = `g:${key}`;
     this._askId = null;
     this._takeError = null;
+    if (this._listError) { this._listError = null; this._renderResults(); }
     this._renderDetail();
     this._el.detail.querySelector(".d-name")?.focus?.();
   }
@@ -1083,12 +1105,15 @@ class CellarionInventoryCard extends HTMLElement {
   // Take out asks inline, in the bottle's own row: no dialog-box (not
   // loaded in a fresh HA session) and no window.confirm (a native dialog
   // makes the HA frontend reload the page). One prompt at a time.
-  _ask(id) {
+  _ask(id, at) {
     if (!id || this._busy.has(id) || !this._index?.byId.has(id)) return;
     this._askId = id;
+    this._askAt = at;
     this._takeError = null;
     this._renderDetail();
-    this._focusKey(`confirm:${id}`);
+    // Focus lands on Cancel, so a second Enter or Space backs out
+    // instead of taking the bottle out.
+    this._focusKey(`cancel:${id}`);
   }
 
   _cancelAsk() {
@@ -1107,6 +1132,7 @@ class CellarionInventoryCard extends HTMLElement {
     this._askId = null;
     this._busy.add(id);
     this._takeError = null;
+    this._listError = null;
     this._renderDetail();
     this._focusKey(`take:${id}`);
     const data = { bottle_id: id };
@@ -1120,7 +1146,16 @@ class CellarionInventoryCard extends HTMLElement {
       await this._hass.callService("cellarion", "consume_bottle", data, undefined, false);
       done = true;
     } catch (err) {
-      this._takeError = { id, message: `Could not take it out: ${errorText(err)}` };
+      const message = `Could not take it out: ${errorText(err)}`;
+      const g = this._openKey && this._view().find((x) => x.key === this._openKey);
+      if (g && g.bottles.some((x) => String(x.raw.id) === id)) {
+        this._takeError = { id, message };
+      } else {
+        // The user went Back or opened another wine while it was sent:
+        // the bottle's row is gone, so say it above the list instead.
+        this._listError = `${this._takeText(b)}: ${errorText(err)}`;
+        this._announce(message);
+      }
     }
     this._busy.delete(id);
     if (done) {
@@ -1131,7 +1166,7 @@ class CellarionInventoryCard extends HTMLElement {
     }
     this._renderResults();
     this._renderDetail();
-    if (done) this._fetch();
+    if (done && this._connected) this._fetch();
   }
 
   // ── Label images ────────────────────────────────────────────────────
@@ -1173,7 +1208,8 @@ class CellarionInventoryCard extends HTMLElement {
   }
 
   _loadImage(url) {
-    if (!url || this._images.has(url) || typeof this._hass?.fetchWithAuth !== "function") return;
+    // Off the page nothing loads: an object URL made now would never be revoked.
+    if (!this._connected || !url || this._images.has(url) || typeof this._hass?.fetchWithAuth !== "function") return;
     this._images.set(url, { pending: true });
     this._imgQueue.push(url);
     this._pumpImages();
@@ -1193,8 +1229,9 @@ class CellarionInventoryCard extends HTMLElement {
         .then((blob) => {
           if (gen !== this._imgGen) return;  // card left the page meanwhile
           const src = URL.createObjectURL(blob);
+          this._images.delete(url);  // re-added as the newest
           this._images.set(url, { src });
-          this._evictImages();
+          this._evictImages(url);
           this._paintThumb(url, src);
         })
         .catch(() => {
@@ -1215,12 +1252,17 @@ class CellarionInventoryCard extends HTMLElement {
     }
   }
 
-  _evictImages() {
+  // Only loaded images count towards the cap (pending and failed entries
+  // hold no object URL), oldest first, and never the one just added.
+  _evictImages(keep) {
+    let loaded = 0;
+    for (const entry of this._images.values()) if (entry.src) loaded++;
     for (const [url, entry] of this._images) {
-      if (this._images.size <= IMAGE_CACHE_MAX) break;
-      if (!entry.src) continue;
+      if (loaded <= IMAGE_CACHE_MAX) break;
+      if (!entry.src || url === keep) continue;
       URL.revokeObjectURL(entry.src);
       this._images.delete(url);
+      loaded--;
     }
   }
 
@@ -1260,9 +1302,10 @@ class CellarionInventoryCardEditor extends HTMLElement {
     for (const t of TOGGLES) {
       if (isShown(config, t.name)) delete config[t.name];
     }
-    for (const key of ["title", "entry_id"]) {
+    for (const key of ["title", "entry_id", "url"]) {
       if (typeof config[key] === "string" && !config[key].trim()) delete config[key];
     }
+    if (typeof config.url === "string") config.url = config.url.trim();
     if (config.max_results == null || config.max_results === "" || !(Number(config.max_results) > 0)) {
       delete config.max_results;
     }
@@ -1280,6 +1323,7 @@ class CellarionInventoryCardEditor extends HTMLElement {
     this._form.schema = [
       { name: "title", selector: { text: {} } },
       { name: "entry_id", selector: { config_entry: { integration: "cellarion" } } },
+      { name: "url", selector: { text: {} } },
       { name: "max_results", selector: { number: { min: 5, max: 500, step: 5, mode: "box" } } },
       {
         name: "",
@@ -1292,6 +1336,7 @@ class CellarionInventoryCardEditor extends HTMLElement {
     this._form.computeLabel = (s) => ({
       title: "Title",
       entry_id: "Account (only if you have several)",
+      url: "Link URL (optional)",
       max_results: `Wines listed before “Show more” (default ${DEFAULT_MAX})`,
       ...Object.fromEntries(TOGGLES.map((t) => [t.name, t.label])),
     }[s.name] || s.name);

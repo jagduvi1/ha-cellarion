@@ -867,7 +867,7 @@ function takeOut(root, id) {
 }
 const prompts = (root) => root.querySelectorAll(".detail .ask");
 
-test("Take out opens an inline prompt in the bottle's row, focused on its confirm button", async () => {
+test("Take out opens an inline prompt in the bottle's row, focused on Cancel", async () => {
   const { card, hass, root } = await mount();
   const detail = openDetail(root, "Château Lafite 2015");
   const [take] = detail.querySelectorAll("button.take");
@@ -881,7 +881,8 @@ test("Take out opens an inline prompt in the bottle's row, focused on its confir
   const buttons = ask.querySelectorAll("button");
   assert.deepEqual(buttons.map(text), ["Cancel", "Take out"]);
   assert.ok(buttons.every((b) => b.getAttribute("type") === "button"));
-  assert.equal(root.activeElement, ask.querySelector('[data-action="confirm-take"]'));
+  // Cancel, not confirm: a second Enter backs out instead of taking it out.
+  assert.equal(root.activeElement, ask.querySelector('[data-action="cancel-take"]'));
   // It sits in that bottle's own row and replaces its actions.
   const row = detail.querySelectorAll(".bottle")[0];
   assert.equal(row.querySelector(".ask"), ask);
@@ -941,9 +942,10 @@ test("the prompt survives hass updates and a refetch, keyboard focus included", 
   const [ask] = prompts(root);
   assert.ok(ask, "prompt still open");
   const confirm = ask.querySelector('[data-action="confirm-take"]');
+  const cancel = ask.querySelector('[data-action="cancel-take"]');
   assert.equal(confirm.dataset.bottle, "b1");
-  assert.notEqual(confirm, first, "the prompt was re-rendered");
-  assert.equal(root.activeElement, confirm);
+  assert.notEqual(cancel, first, "the prompt was re-rendered");
+  assert.equal(root.activeElement, cancel);
   confirm.click();
   await flush();
   assert.deepEqual(hass.serviceCalls.map((c) => c[2].bottle_id), ["b1"]);
@@ -1041,6 +1043,91 @@ test("the script-focused detail heading draws no outline", async () => {
   assert.doesNotMatch(css, /\.d-name:focus-visible/);
 });
 
+test("a double-click or a quick second tap on Take out does not confirm", async () => {
+  const { hass, root } = await mount();
+  const detail = openDetail(root, "Château Lafite 2015");
+  detail.querySelector('button.take[data-bottle="b2"]').dispatch("click", { detail: 1, timeStamp: 1000 });
+  const confirm = () => root.querySelector('.detail [data-action="confirm-take"]');
+  confirm().dispatch("click", { detail: 2, timeStamp: 1150 });  // a double-click's second click
+  confirm().dispatch("click", { detail: 1, timeStamp: 1300 });  // a quick second tap
+  await flush();
+  assert.equal(hass.serviceCalls.length, 0);
+  assert.equal(prompts(root).length, 1, "the prompt stays open");
+  confirm().dispatch("click", { detail: 1, timeStamp: 1600 });
+  await flush();
+  assert.deepEqual(hass.serviceCalls.map((c) => c[2].bottle_id), ["b2"]);
+});
+
+test("a take-out that fails after the user went Back is shown above the list", async () => {
+  const hass = makeHass();
+  let fail;
+  hass.callService = function (...args) { this.serviceCalls.push(args); return new Promise((_, r) => { fail = r; }); };
+  const { root } = await mount({}, hass);
+  openDetail(root, "Château Lafite 2015");
+  takeOut(root, "b2");
+  root.querySelector('.detail [data-action="back"]').click();
+  fail({ message: "Cellarion unreachable" });
+  await flush();
+  const notice = root.querySelector(".notice .error");
+  assert.ok(notice, "error shown in the list");
+  assert.match(text(notice), /Could not take it out/);
+  assert.match(text(notice), /Château Lafite 2015.*Cellarion unreachable/);
+  assert.match(text(root.querySelector(".announce")), /Could not take it out: Cellarion unreachable/);
+  openDetail(root, "Château Lafite 2015");
+  assert.equal(root.querySelector(".notice .error"), null, "gone once the user moves on");
+});
+
+test("a filter whose chips disappear is dropped, so type-less wines show again", async () => {
+  const { card, hass, root } = await mount();
+  chip(root, "type", "red").click();
+  // All whites and rosés leave; only red + the pending (type-less) wines remain.
+  hass.inventory.bottles = hass.inventory.bottles.filter((b) => !["b4", "b5"].includes(b.id));
+  await card._fetch();
+  await flush();
+  assert.equal(root.querySelectorAll('[data-action="type"]').length, 0);
+  assert.equal(card._types.size, 0);
+  assert.ok(rowLabels(root).some((l) => l.startsWith("Mystery")), "pending wines visible");
+});
+
+test("only loaded label images count towards the cache cap, and a fresh one is never evicted", async () => {
+  const hass = makeHass();
+  let first = true;
+  hass.fetchWithAuth = function (url) {
+    this.fetches.push(url);
+    if (first) { first = false; return Promise.resolve({ ok: true, status: 200, blob: async () => new Blob(["img"]) }); }
+    return new Promise(() => {});  // stays pending
+  };
+  const { card } = await mount({}, hass);
+  const created0 = objectUrls.created.length;
+  const revoked0 = objectUrls.revoked.length;
+  for (let i = 0; i < 250; i++) card._loadImage(`/api/cellarion/image/entry-a/processed/x${i}.webp.webp`);
+  await flush();
+  assert.equal(objectUrls.created.length - created0, 1);
+  assert.equal(objectUrls.revoked.length - revoked0, 0);
+  assert.ok(card._images.get("/api/cellarion/image/entry-a/processed/x0.webp.webp")?.src);
+});
+
+test("nothing loads after the card left the page", async () => {
+  const hass = makeHass();
+  let finish;
+  hass.callService = function (...args) {
+    this.serviceCalls.push(args);
+    this.inventory.bottles = this.inventory.bottles.filter((b) => b.id !== args[2].bottle_id);
+    return new Promise((r) => { finish = r; });
+  };
+  const { card, root } = await mount({}, hass);
+  openDetail(root, "Château Lafite 2015");
+  await flush();
+  takeOut(root, "b2");
+  card.disconnectedCallback();
+  const c0 = objectUrls.created.length;
+  const ws0 = hass.wsCalls.length;
+  finish();
+  await flush();
+  assert.equal(objectUrls.created.length, c0, "no object URL made after disconnect");
+  assert.equal(hass.wsCalls.length, ws0, "no refetch after disconnect");
+});
+
 // ── Links and escaping ──────────────────────────────────────────────
 
 test("Open in Cellarion deep-links each bottle in a new tab", async () => {
@@ -1063,6 +1150,37 @@ test("a non-http instance_url gives no link anywhere", async () => {
     const inv = inventory();
     inv.instance_url = url;
     const { root } = await mount({}, makeHass(inv));
+    const detail = openDetail(root, "Château Lafite 2015");
+    assert.equal(detail.querySelectorAll("a").length, 0, url);
+    assert.equal(root.querySelector("a.title"), null, url);
+    assert.ok(!root.innerHTML.includes("javascript:"), url);
+  }
+});
+
+test("a url in the card config replaces the integration's address in every link", async () => {
+  const { root } = await mount({ url: "http://cellar.lan:8080/" });
+  const links = openDetail(root, "Château Lafite 2015").querySelectorAll("a.link");
+  assert.deepEqual(links.map((a) => a.getAttribute("href")), [
+    "http://cellar.lan:8080/cellars/c1/bottles/b2",
+    "http://cellar.lan:8080/cellars/c1/bottles/b1",
+  ]);
+  assert.equal(root.querySelector("a.title").getAttribute("href"), "http://cellar.lan:8080");
+});
+
+test("a url with stray spaces still links, and the editor saves it trimmed", async () => {
+  const { root } = await mount({ url: " https://cellar.lan/ " });
+  openDetail(root, "Château Lafite 2015");
+  assert.equal(root.querySelector("a.title").getAttribute("href"), "https://cellar.lan");
+  const editor = new Editor();
+  editor.setConfig({ type: "custom:cellarion-inventory-card" });
+  const form = editor.children[0];
+  form.fire("value-changed", { value: { ...form.data, url: " https://cellar.lan " } });
+  assert.equal(editor.dispatched.at(-1).detail.config.url, "https://cellar.lan");
+});
+
+test("a non-http url in the card config gives no link anywhere", async () => {
+  for (const url of ["javascript:alert(1)", "cellar.lan:8080"]) {
+    const { root } = await mount({ url });
     const detail = openDetail(root, "Château Lafite 2015");
     assert.equal(detail.querySelectorAll("a").length, 0, url);
     assert.equal(root.querySelector("a.title"), null, url);
@@ -1319,9 +1437,10 @@ test("the editor ticks every toggle by default and offers the options", () => {
     assert.equal(form.data[flag], true, flag);
   }
   const names = form.schema.flatMap((s) => (s.schema ? s.schema.map((x) => x.name) : [s.name]));
-  for (const name of ["title", "entry_id", "max_results", "show_value", "show_consume"]) {
+  for (const name of ["title", "entry_id", "url", "max_results", "show_value", "show_consume"]) {
     assert.ok(names.includes(name), name);
   }
+  assert.equal(form.computeLabel({ name: "url" }), "Link URL (optional)");
   assert.equal(form.computeLabel({ name: "show_value" }), "Prices");
   assert.equal(form.computeLabel({ name: "show_consume" }), "Take-out buttons");
 });
@@ -1330,10 +1449,12 @@ test("the editor writes back only what differs from the defaults", () => {
   const editor = new Editor();
   editor.setConfig({ type: "custom:cellarion-inventory-card" });
   const form = editor.children[0];
-  form.fire("value-changed", { value: { ...form.data, show_value: false, title: " ", entry_id: "", max_results: null } });
+  form.fire("value-changed", { value: { ...form.data, show_value: false, title: " ", entry_id: "", url: "  ", max_results: null } });
   assert.deepEqual(editor.dispatched.at(-1).detail.config, { type: "custom:cellarion-inventory-card", show_value: false });
   form.fire("value-changed", { value: { ...form.data, max_results: 50 } });
   assert.equal(editor.dispatched.at(-1).detail.config.max_results, 50);
+  form.fire("value-changed", { value: { ...form.data, url: "http://cellar.lan:8080" } });
+  assert.equal(editor.dispatched.at(-1).detail.config.url, "http://cellar.lan:8080");
 });
 
 test("registers the card for the card picker", () => {
