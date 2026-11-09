@@ -43,7 +43,7 @@ def test_export_produces_a_core_layout(tmp_path: Path, stage: str) -> None:
     manifest = json.loads((comp / "manifest.json").read_text(encoding="utf-8"))
     assert "version" not in manifest and "issue_tracker" not in manifest
     assert "dependencies" not in manifest and "after_dependencies" not in manifest
-    assert manifest["requirements"] == ["pycellarion==0.2.0"]
+    assert manifest["requirements"] == ["pycellarion==0.2.1"]
     assert manifest["loggers"] == ["pycellarion"]
     assert manifest["documentation"] == "https://www.home-assistant.io/integrations/cellarion"
     assert manifest["quality_scale"] == ("bronze" if stage == "minimal" else "platinum")
