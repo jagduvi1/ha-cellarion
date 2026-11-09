@@ -58,8 +58,8 @@ class CellarionImageView(HomeAssistantView):
         # Two requests that missed the same image both land here; count the
         # replaced copy out, or the byte total drifts up until the cache
         # evicts everything it stores.
-        if (old := self._cache.pop(key, None)) is not None:
-            self._cache_bytes -= len(old[0])
+        if (replaced := self._cache.pop(key, None)) is not None:
+            self._cache_bytes -= len(replaced[0])
         self._cache[key] = (body, content_type)
         self._cache_bytes += len(body)
         while self._cache and (
