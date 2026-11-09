@@ -11,6 +11,10 @@
  *   title: Cellar inventory      (optional)
  *   entry_id: <config entry>     (optional — only needed when more than one
  *                                 Cellarion account is configured)
+ *   url: https://cellarion.app   (optional — the address the title and the
+ *                                 "Open in Cellarion" links use, when your
+ *                                 browser reaches Cellarion at another address
+ *                                 than Home Assistant does)
  *   max_results: 30              (optional — wines listed before "Show more")
  *   show_value: false            (optional — each show_* flag in TOGGLES
  *                                 below defaults to true; false hides prices,
@@ -599,7 +603,7 @@ class CellarionInventoryCard extends HTMLElement {
   }
 
   _instanceUrl() {
-    const raw = this._index?.data?.instance_url;
+    const raw = this._config?.url || this._index?.data?.instance_url;
     // Only ever link to an http(s) target, never javascript:/data:.
     return typeof raw === "string" && /^https?:\/\/[^\s"'<>]+$/i.test(raw) ? raw.replace(/\/+$/, "") : null;
   }
@@ -1260,7 +1264,7 @@ class CellarionInventoryCardEditor extends HTMLElement {
     for (const t of TOGGLES) {
       if (isShown(config, t.name)) delete config[t.name];
     }
-    for (const key of ["title", "entry_id"]) {
+    for (const key of ["title", "entry_id", "url"]) {
       if (typeof config[key] === "string" && !config[key].trim()) delete config[key];
     }
     if (config.max_results == null || config.max_results === "" || !(Number(config.max_results) > 0)) {
@@ -1280,6 +1284,7 @@ class CellarionInventoryCardEditor extends HTMLElement {
     this._form.schema = [
       { name: "title", selector: { text: {} } },
       { name: "entry_id", selector: { config_entry: { integration: "cellarion" } } },
+      { name: "url", selector: { text: {} } },
       { name: "max_results", selector: { number: { min: 5, max: 500, step: 5, mode: "box" } } },
       {
         name: "",
@@ -1292,6 +1297,7 @@ class CellarionInventoryCardEditor extends HTMLElement {
     this._form.computeLabel = (s) => ({
       title: "Title",
       entry_id: "Account (only if you have several)",
+      url: "Link URL (optional)",
       max_results: `Wines listed before “Show more” (default ${DEFAULT_MAX})`,
       ...Object.fromEntries(TOGGLES.map((t) => [t.name, t.label])),
     }[s.name] || s.name);

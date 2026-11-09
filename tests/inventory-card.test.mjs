@@ -1070,6 +1070,26 @@ test("a non-http instance_url gives no link anywhere", async () => {
   }
 });
 
+test("a url in the card config replaces the integration's address in every link", async () => {
+  const { root } = await mount({ url: "http://cellar.lan:8080/" });
+  const links = openDetail(root, "Château Lafite 2015").querySelectorAll("a.link");
+  assert.deepEqual(links.map((a) => a.getAttribute("href")), [
+    "http://cellar.lan:8080/cellars/c1/bottles/b2",
+    "http://cellar.lan:8080/cellars/c1/bottles/b1",
+  ]);
+  assert.equal(root.querySelector("a.title").getAttribute("href"), "http://cellar.lan:8080");
+});
+
+test("a non-http url in the card config gives no link anywhere", async () => {
+  for (const url of ["javascript:alert(1)", "cellar.lan:8080"]) {
+    const { root } = await mount({ url });
+    const detail = openDetail(root, "Château Lafite 2015");
+    assert.equal(detail.querySelectorAll("a").length, 0, url);
+    assert.equal(root.querySelector("a.title"), null, url);
+    assert.ok(!root.innerHTML.includes("javascript:"), url);
+  }
+});
+
 test("wine names and other server text are escaped", async () => {
   const evil = `<img src=x onerror="alert(1)">`;
   const inv = inventory();
@@ -1319,9 +1339,10 @@ test("the editor ticks every toggle by default and offers the options", () => {
     assert.equal(form.data[flag], true, flag);
   }
   const names = form.schema.flatMap((s) => (s.schema ? s.schema.map((x) => x.name) : [s.name]));
-  for (const name of ["title", "entry_id", "max_results", "show_value", "show_consume"]) {
+  for (const name of ["title", "entry_id", "url", "max_results", "show_value", "show_consume"]) {
     assert.ok(names.includes(name), name);
   }
+  assert.equal(form.computeLabel({ name: "url" }), "Link URL (optional)");
   assert.equal(form.computeLabel({ name: "show_value" }), "Prices");
   assert.equal(form.computeLabel({ name: "show_consume" }), "Take-out buttons");
 });
@@ -1330,10 +1351,12 @@ test("the editor writes back only what differs from the defaults", () => {
   const editor = new Editor();
   editor.setConfig({ type: "custom:cellarion-inventory-card" });
   const form = editor.children[0];
-  form.fire("value-changed", { value: { ...form.data, show_value: false, title: " ", entry_id: "", max_results: null } });
+  form.fire("value-changed", { value: { ...form.data, show_value: false, title: " ", entry_id: "", url: "  ", max_results: null } });
   assert.deepEqual(editor.dispatched.at(-1).detail.config, { type: "custom:cellarion-inventory-card", show_value: false });
   form.fire("value-changed", { value: { ...form.data, max_results: 50 } });
   assert.equal(editor.dispatched.at(-1).detail.config.max_results, 50);
+  form.fire("value-changed", { value: { ...form.data, url: "http://cellar.lan:8080" } });
+  assert.equal(editor.dispatched.at(-1).detail.config.url, "http://cellar.lan:8080");
 });
 
 test("registers the card for the card picker", () => {
